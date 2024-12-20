@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     // associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount, Transfer, transfer},
+    token::{Mint, Token, TokenAccount, Transfer, transfer, CloseAccount, close_account},
 };
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -23,6 +23,31 @@ pub mod devotion {
     }
 
     pub fn devote(ctx: Context<Devote>, amount: u64) -> Result<()> {
+        let devoted = &mut ctx.accounts.devoted;
+        
+        // Calculate current devotion before adding new tokens
+        if devoted.amount > 0 {
+            let current_time = Clock::get()?.unix_timestamp;
+            let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
+            
+            // Cap the seconds at maximum multiplier
+            let capped_seconds = std::cmp::min(seconds_staked, MAX_MULTIPLIER_SECONDS);
+            
+            // Calculate devotion from existing stake
+            let devotion = (capped_seconds as u64)
+                .checked_mul(devoted.amount)
+                .unwrap_or(0)
+                .checked_div(TOKEN_DECIMALS)
+                .unwrap_or(0)
+                .checked_div(SECONDS_PER_DAY as u64)
+                .unwrap_or(0);
+                
+            // Add to residual devotion
+            devoted.residual_devotion = devoted.residual_devotion
+                .checked_add(devotion)
+                .unwrap_or(devoted.residual_devotion);
+        }
+
         // Transfer tokens from user to vault
         let cpi_accounts = Transfer {
             from: ctx.accounts.user_token_account.to_account_info(),
@@ -35,7 +60,6 @@ pub mod devotion {
         transfer(cpi_ctx, amount)?;
 
         // Update user's stake info
-        let devoted = &mut ctx.accounts.devoted;
         devoted.amount = devoted.amount.checked_add(amount).unwrap();
         devoted.user = ctx.accounts.user.key();
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
@@ -67,6 +91,24 @@ pub mod devotion {
         // Update user's stake info
         let devoted = &mut ctx.accounts.devoted;
         devoted.amount = devoted.amount.checked_sub(amount).unwrap();
+        
+        // Reset timestamp to current time and clear residual devotion
+        devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
+        devoted.residual_devotion = 0;
+
+        // If user has removed all tokens, close their devoted account
+        if devoted.amount == 0 {
+            let cpi_accounts = CloseAccount {
+                account: ctx.accounts.devoted.to_account_info(),
+                destination: ctx.accounts.user.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            };
+            let cpi_ctx = CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                cpi_accounts,
+            );
+            close_account(cpi_ctx)?;
+        }
 
         Ok(())
     }
@@ -79,11 +121,13 @@ pub mod devotion {
         // Cap the seconds at maximum multiplier
         let capped_seconds = std::cmp::min(seconds_staked, MAX_MULTIPLIER_SECONDS);
         
-        // Calculate devotion: (seconds_staked * amount) / (token_decimals)
+        // Calculate devotion: (seconds_staked * amount) / (token_decimals * seconds_per_day)
         let devotion = (capped_seconds as u64)
             .checked_mul(devoted.amount)
             .unwrap_or(0)
             .checked_div(TOKEN_DECIMALS)
+            .unwrap_or(0)
+            .checked_div(SECONDS_PER_DAY as u64)  // Normalize to devotion per day
             .unwrap_or(0);
             
         let total_devotion = devotion
@@ -206,6 +250,7 @@ pub struct Waver<'info> {
     pub devoted: Account<'info, Devoted>,
 
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
