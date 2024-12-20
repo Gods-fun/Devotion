@@ -18,7 +18,7 @@ pub mod devotion {
         Ok(())
     }
 
-    pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
+    pub fn devote(ctx: Context<Devote>, amount: u64) -> Result<()> {
         // Transfer tokens from user to vault
         let cpi_accounts = Transfer {
             from: ctx.accounts.user_token_account.to_account_info(),
@@ -31,15 +31,15 @@ pub mod devotion {
         transfer(cpi_ctx, amount)?;
 
         // Update user's stake info
-        let user_stake = &mut ctx.accounts.user_stake;
-        user_stake.amount = user_stake.amount.checked_add(amount).unwrap();
-        user_stake.user = ctx.accounts.user.key();
-        user_stake.last_stake_timestamp = Clock::get()?.unix_timestamp;
+        let devoted = &mut ctx.accounts.devoted;
+        devoted.amount = devoted.amount.checked_add(amount).unwrap();
+        devoted.user = ctx.accounts.user.key();
+        devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
 
         Ok(())
     }
 
-    pub fn unstake(ctx: Context<Unstake>, amount: u64) -> Result<()> {
+    pub fn waver(ctx: Context<Waver>, amount: u64) -> Result<()> {
         let state = &ctx.accounts.state;
         
         // Transfer from vault to user
@@ -61,8 +61,8 @@ pub mod devotion {
         transfer(cpi_ctx, amount)?;
 
         // Update user's stake info
-        let user_stake = &mut ctx.accounts.user_stake;
-        user_stake.amount = user_stake.amount.checked_sub(amount).unwrap();
+        let devoted = &mut ctx.accounts.devoted;
+        devoted.amount = devoted.amount.checked_sub(amount).unwrap();
 
         Ok(())
     }
@@ -76,7 +76,7 @@ pub struct StakeState {
 }
 
 #[account]
-pub struct UserStake {
+pub struct Devoted {
     pub user: Pubkey,
     pub amount: u64,
     pub residual_devotion: u64,
@@ -113,7 +113,7 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Stake<'info> {
+pub struct Devote<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -139,17 +139,17 @@ pub struct Stake<'info> {
         init_if_needed,
         payer = user,
         space = 8 + 32 + 8 + 8,
-        seeds = [b"user_stake", user.key().as_ref()],
+        seeds = [b"devoted", user.key().as_ref()],
         bump
     )]
-    pub user_stake: Account<'info, UserStake>,
+    pub devoted: Account<'info, Devoted>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
-pub struct Unstake<'info> {
+pub struct Waver<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -173,11 +173,11 @@ pub struct Unstake<'info> {
 
     #[account(
         mut,
-        seeds = [b"user_stake", user.key().as_ref()],
+        seeds = [b"devoted", user.key().as_ref()],
         bump,
-        constraint = user_stake.user == user.key()
+        constraint = devoted.user == user.key()
     )]
-    pub user_stake: Account<'info, UserStake>,
+    pub devoted: Account<'info, Devoted>,
 
     pub token_program: Program<'info, Token>,
 }
