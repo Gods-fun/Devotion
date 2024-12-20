@@ -18,7 +18,6 @@ pub mod devotion {
         let state = &mut ctx.accounts.state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
-        state.vault_bump = ctx.bumps.vault;
         Ok(())
     }
 
@@ -48,10 +47,10 @@ pub mod devotion {
                 .unwrap_or(devoted.residual_devotion);
         }
 
-        // Transfer tokens from user to vault
+        // Transfer tokens from user to their vault
         let cpi_accounts = Transfer {
             from: ctx.accounts.user_token_account.to_account_info(),
-            to: ctx.accounts.vault.to_account_info(),
+            to: ctx.accounts.user_vault.to_account_info(),
             authority: ctx.accounts.user.to_account_info(),
         };
         
@@ -68,20 +67,21 @@ pub mod devotion {
     }
 
     pub fn waver(ctx: Context<Waver>, amount: u64) -> Result<()> {
-        let state = &ctx.accounts.state;
+        let _state = &ctx.accounts.state;
         
-        // Transfer from vault to user
+        // Transfer from user's vault to user
+        let binding = &ctx.accounts.devoted;
         let seeds = &[
-            b"vault".as_ref(),
-            state.stake_mint.as_ref(),
-            &[state.vault_bump],
+            b"devoted".as_ref(),
+            binding.user.as_ref(),
+            &[ctx.bumps.devoted],
         ];
         let signer = [&seeds[..]];
         
         let cpi_accounts = Transfer {
-            from: ctx.accounts.vault.to_account_info(),
+            from: ctx.accounts.user_vault.to_account_info(),
             to: ctx.accounts.user_token_account.to_account_info(),
-            authority: ctx.accounts.vault.to_account_info(),
+            authority: ctx.accounts.devoted.to_account_info(),
         };
         
         let cpi_program = ctx.accounts.token_program.to_account_info();
@@ -96,8 +96,30 @@ pub mod devotion {
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
         devoted.residual_devotion = 0;
 
-        // If user has removed all tokens, close their devoted account
+        // If user has removed all tokens, close their devoted account and vault
         if devoted.amount == 0 {
+            let binding = ctx.accounts.user.key();
+            // Close the vault account first
+            let seeds = &[
+                b"devoted".as_ref(),
+                binding.as_ref(),
+                &[ctx.bumps.devoted],
+            ];
+            let signer = [&seeds[..]];
+            
+            let cpi_accounts = CloseAccount {
+                account: ctx.accounts.user_vault.to_account_info(),
+                destination: ctx.accounts.user.to_account_info(),
+                authority: ctx.accounts.devoted.to_account_info(),
+            };
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+                &signer
+            );
+            close_account(cpi_ctx)?;
+
+            // Then close the devoted account
             let cpi_accounts = CloseAccount {
                 account: ctx.accounts.devoted.to_account_info(),
                 destination: ctx.accounts.user.to_account_info(),
@@ -142,7 +164,6 @@ pub mod devotion {
 pub struct StakeState {
     pub admin: Pubkey,
     pub stake_mint: Pubkey,
-    pub vault_bump: u8,
 }
 
 #[account]
@@ -163,19 +184,9 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 32 + 1
+        space = 8 + 32 + 32
     )]
     pub state: Account<'info, StakeState>,
-
-    #[account(
-        init,
-        payer = admin,
-        seeds = [b"vault", stake_mint.key().as_ref()],
-        bump,
-        token::mint = stake_mint,
-        token::authority = vault,
-    )]
-    pub vault: Account<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -190,11 +201,14 @@ pub struct Devote<'info> {
     pub state: Account<'info, StakeState>,
 
     #[account(
-        mut,
-        seeds = [b"vault", state.stake_mint.as_ref()],
-        bump = state.vault_bump,
+        init_if_needed,
+        payer = user,
+        seeds = [b"vault", user.key().as_ref()],
+        bump,
+        token::mint = stake_mint,
+        token::authority = devoted,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    pub user_vault: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -208,7 +222,7 @@ pub struct Devote<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        space = 8 + 32 + 8 + 8,
+        space = 8 + 32 + 8 + 8 + 8,
         seeds = [b"devoted", user.key().as_ref()],
         bump
     )]
@@ -227,10 +241,12 @@ pub struct Waver<'info> {
 
     #[account(
         mut,
-        seeds = [b"vault", state.stake_mint.as_ref()],
-        bump = state.vault_bump,
+        seeds = [b"vault", user.key().as_ref()],
+        bump,
+        token::mint = stake_mint,
+        token::authority = devoted,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    pub user_vault: Account<'info, TokenAccount>,
 
     #[account(
         mut,
