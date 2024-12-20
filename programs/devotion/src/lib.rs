@@ -6,6 +6,10 @@ use anchor_spl::{
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
+pub const SECONDS_PER_DAY: i64 = 86_400;
+pub const MAX_MULTIPLIER_SECONDS: i64 = SECONDS_PER_DAY * 180; // 180 days in seconds
+pub const TOKEN_DECIMALS: u64 = 1_000_000_000; // 10^9
+
 #[program]
 pub mod devotion {
     use super::*;
@@ -65,6 +69,28 @@ pub mod devotion {
         devoted.amount = devoted.amount.checked_sub(amount).unwrap();
 
         Ok(())
+    }
+
+    pub fn check_devotion(ctx: Context<CheckDevotion>) -> Result<u64> {
+        let devoted = &ctx.accounts.devoted;
+        let current_time = Clock::get()?.unix_timestamp;
+        let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
+        
+        // Cap the seconds at maximum multiplier
+        let capped_seconds = std::cmp::min(seconds_staked, MAX_MULTIPLIER_SECONDS);
+        
+        // Calculate devotion: (seconds_staked * amount) / (token_decimals)
+        let devotion = (capped_seconds as u64)
+            .checked_mul(devoted.amount)
+            .unwrap_or(0)
+            .checked_div(TOKEN_DECIMALS)
+            .unwrap_or(0);
+            
+        let total_devotion = devotion
+            .checked_add(devoted.residual_devotion)
+            .unwrap_or(devoted.residual_devotion);
+            
+        Ok(total_devotion)
     }
 }
 
@@ -180,4 +206,9 @@ pub struct Waver<'info> {
     pub devoted: Account<'info, Devoted>,
 
     pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct CheckDevotion<'info> {
+    pub devoted: Account<'info, Devoted>,
 }
