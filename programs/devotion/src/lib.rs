@@ -18,6 +18,11 @@ pub mod devotion {
         let state = &mut ctx.accounts.state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
+        
+        // Initialize total devoted
+        let total_devoted = &mut ctx.accounts.total_devoted;
+        total_devoted.total_tokens = 0;
+        
         Ok(())
     }
 
@@ -62,6 +67,10 @@ pub mod devotion {
         devoted.amount = devoted.amount.checked_add(amount).unwrap();
         devoted.user = ctx.accounts.user.key();
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
+
+        // Update total devoted
+        let total_devoted = &mut ctx.accounts.total_devoted;
+        total_devoted.total_tokens = total_devoted.total_tokens.checked_add(amount).unwrap();
 
         Ok(())
     }
@@ -132,6 +141,10 @@ pub mod devotion {
             close_account(cpi_ctx)?;
         }
 
+        // Update total devoted
+        let total_devoted = &mut ctx.accounts.total_devoted;
+        total_devoted.total_tokens = total_devoted.total_tokens.checked_sub(amount).unwrap();
+
         Ok(())
     }
 
@@ -174,6 +187,11 @@ pub struct Devoted {
     pub last_stake_timestamp: i64,
 }
 
+#[account]
+pub struct TotalDevoted {
+    pub total_tokens: u64,
+}
+
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
@@ -184,9 +202,20 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 32
+        space = 8 + 32 + 32,
+        seeds = [b"state", ID.as_ref()],
+        bump
     )]
     pub state: Account<'info, StakeState>,
+
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + 8, // discriminator + u64
+        seeds = [b"total_devoted", ID.as_ref()],
+        bump
+    )]
+    pub total_devoted: Account<'info, TotalDevoted>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -198,12 +227,17 @@ pub struct Devote<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    #[account(
+        seeds = [b"state", ID.as_ref()],
+        bump,
+        constraint = state.stake_mint == stake_mint.key()
+    )]
     pub state: Account<'info, StakeState>,
 
     #[account(
         init_if_needed,
         payer = user,
-        seeds = [b"vault", user.key().as_ref()],
+        seeds = [b"vault", ID.as_ref(), user.key().as_ref()],
         bump,
         token::mint = stake_mint,
         token::authority = devoted,
@@ -217,16 +251,26 @@ pub struct Devote<'info> {
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
+    #[account(
+        constraint = state.stake_mint == stake_mint.key()
+    )]
     pub stake_mint: Account<'info, Mint>,
 
     #[account(
         init_if_needed,
         payer = user,
         space = 8 + 32 + 8 + 8 + 8,
-        seeds = [b"devoted", user.key().as_ref()],
+        seeds = [b"devoted", ID.as_ref(), user.key().as_ref()],
         bump
     )]
     pub devoted: Account<'info, Devoted>,
+
+    #[account(
+        mut,
+        seeds = [b"total_devoted", ID.as_ref()],
+        bump
+    )]
+    pub total_devoted: Account<'info, TotalDevoted>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -237,11 +281,16 @@ pub struct Waver<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    #[account(
+        seeds = [b"state", ID.as_ref()],
+        bump,
+        constraint = state.stake_mint == stake_mint.key()
+    )]
     pub state: Account<'info, StakeState>,
 
     #[account(
         mut,
-        seeds = [b"vault", user.key().as_ref()],
+        seeds = [b"vault", ID.as_ref(), user.key().as_ref()],
         bump,
         token::mint = stake_mint,
         token::authority = devoted,
@@ -255,15 +304,25 @@ pub struct Waver<'info> {
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
+    #[account(
+        constraint = state.stake_mint == stake_mint.key()
+    )]
     pub stake_mint: Account<'info, Mint>,
 
     #[account(
         mut,
-        seeds = [b"devoted", user.key().as_ref()],
+        seeds = [b"devoted", ID.as_ref(), user.key().as_ref()],
         bump,
         constraint = devoted.user == user.key()
     )]
     pub devoted: Account<'info, Devoted>,
+
+    #[account(
+        mut,
+        seeds = [b"total_devoted", ID.as_ref()],
+        bump
+    )]
+    pub total_devoted: Account<'info, TotalDevoted>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
