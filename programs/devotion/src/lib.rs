@@ -4,7 +4,7 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount, Transfer, transfer, CloseAccount, close_account},
 };
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("FMzU5SZEeAnP9ts9DZ9rJuFyimTfshwjQp4A3Kjm6Kf7");
 
 pub const SECONDS_PER_DAY: i64 = 86_400;
 pub const MAX_MULTIPLIER_SECONDS: i64 = SECONDS_PER_DAY * 180; // 180 days in seconds
@@ -18,7 +18,6 @@ pub mod devotion {
         let state = &mut ctx.accounts.stake_state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
-        state.stake_program = ctx.accounts.stake_program.key();
         state.bump = ctx.bumps.stake_state;
         
         // Initialize total devoted
@@ -181,7 +180,6 @@ pub mod devotion {
 pub struct StakeState {
     pub admin: Pubkey,
     pub stake_mint: Pubkey,
-    pub stake_program: Pubkey,
     pub bump: u8,
 }
 
@@ -208,7 +206,6 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
 
     pub stake_mint: Account<'info, Mint>,
-    pub stake_program: Program<'info, Token>,
 
     #[account(
         init,
@@ -314,9 +311,7 @@ pub struct Waver<'info> {
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
-    #[account(
-        constraint = state.stake_mint == stake_mint.key()
-    )]
+    #[account(constraint = state.stake_mint == stake_mint.key())]
     pub stake_mint: Account<'info, Mint>,
 
     #[account(
