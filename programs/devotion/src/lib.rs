@@ -52,6 +52,9 @@ pub mod devotion {
             devoted.residual_devotion = devoted.residual_devotion
                 .checked_add(devotion)
                 .unwrap_or(devoted.residual_devotion);
+        } else {
+            // Initialize user data if this is their first stake
+            devoted.user = ctx.accounts.user.key();
         }
 
         // Transfer tokens from user to their vault
@@ -67,7 +70,6 @@ pub mod devotion {
 
         // Update user's stake info
         devoted.amount = devoted.amount.checked_add(amount).unwrap();
-        devoted.user = ctx.accounts.user.key();
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
 
         // Update total devoted
@@ -266,7 +268,7 @@ pub struct Devote<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        space = 8 + 32 + 8 + 8 + 8,
+        space = 8 + Devoted::INIT_SPACE,
         seeds = [b"devoted", id().as_ref(), user.key().as_ref()],
         bump,
     )]
