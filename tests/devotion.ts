@@ -7,6 +7,8 @@ import { assert } from "chai";
 
 const TOKEN_DECIMALS = 1_000_000_000; // 10^9
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 describe("devotion", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -90,14 +92,14 @@ describe("devotion", () => {
       userKeypair.publicKey
     );
 
-    // Mint some tokens to user
+    // Mint 1 million tokens to user (reduced from 200 million)
     await mintTo(
       provider.connection,
       admin,
       stakeMint,
       userTokenAccount,
       admin,
-      1000 * TOKEN_DECIMALS
+      1_000_000 * TOKEN_DECIMALS
     );
 
     // Derive PDAs for user
@@ -119,7 +121,7 @@ describe("devotion", () => {
         .accounts({
           admin: admin.publicKey,
           stakeMint: stakeMint,
-          stakeState: stateAddress,
+          state: stateAddress,
           totalDevoted: totalDevotedAddress,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -159,7 +161,7 @@ describe("devotion", () => {
   });
 
   it("Can devote tokens", async () => {
-    const amountToDevote = new anchor.BN(100 * TOKEN_DECIMALS);
+    const amountToDevote = new anchor.BN(600_000).mul(new anchor.BN(TOKEN_DECIMALS));
 
     const tx = await program.methods
       .devote(amountToDevote)
@@ -188,7 +190,7 @@ describe("devotion", () => {
     assert.ok(devotedAccount.user.equals(userKeypair.publicKey), "Wrong user in devoted account");
     assert.ok(devotedAccount.amount.eq(amountToDevote), "Wrong amount in devoted account");
     assert.equal(devotedAccount.residualDevotion.toNumber(), 0, "Initial residual devotion should be 0");
-    assert.ok(devotedAccount.lastStakeTimestamp > 0, "Last stake timestamp should be set");
+    assert.ok(devotedAccount.lastStakeTimestamp.toNumber() > 0, "Last stake timestamp should be set");
 
     // Verify the total devoted
     assert.ok(totalDevotedAccount.totalTokens.eq(amountToDevote), "Wrong total devoted amount");
@@ -202,26 +204,25 @@ describe("devotion", () => {
   });
 
   it("Can add to existing devotion", async () => {
+    // Get initial balances and state
+    const initialVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    const initialUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    
+    console.log("\n=== Initial State ===");
+    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
+    console.log("Initial user token balance:", initialUserBalance.value.uiAmount, "tokens");
+    console.log("Initial devoted amount:", initialDevoted.amount.toString(), "raw units");
+    console.log("Initial devoted amount (formatted):", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Initial residual devotion:", initialDevoted.residualDevotion.toString());
+
     // Get initial slot and timestamp
     let slot = await provider.connection.getSlot();
     let initialTimestamp = (await provider.connection.getBlockTime(slot)) as number;
     console.log("\nInitial timestamp:", new Date(initialTimestamp * 1000).toISOString());
 
-    // Create a transaction with multiple instructions to advance the clock
-    const advanceClockTx = new anchor.web3.Transaction();
-    for (let i = 0; i < 10; i++) {
-      advanceClockTx.add(
-        SystemProgram.transfer({
-          fromPubkey: admin.publicKey,
-          toPubkey: userKeypair.publicKey,
-          lamports: anchor.web3.LAMPORTS_PER_SOL / 100,
-        })
-      );
-    }
-
-    // Send and confirm the transaction
-    const clockTx = await provider.sendAndConfirm(advanceClockTx, [admin]);
-    console.log("Clock advance transaction signature:", clockTx);
+    await provider.connection.requestAirdrop(provider.wallet.publicKey, 1);
+    await sleep(1000); // Small delay to ensure slot advancement
 
     // Get new timestamp
     slot = await provider.connection.getSlot();
@@ -229,10 +230,8 @@ describe("devotion", () => {
     console.log("New timestamp:", new Date(newTimestamp * 1000).toISOString());
     console.log("Time difference:", (newTimestamp - initialTimestamp), "seconds");
 
-    // Add a small delay to ensure the clock has advanced
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const additionalAmount = new anchor.BN(50 * TOKEN_DECIMALS);
+    const additionalAmount = new anchor.BN(400_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    console.log("\nAdditional amount to devote:", additionalAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
 
     // Get initial devotion
     const initialDevotion = await program.methods
@@ -242,13 +241,13 @@ describe("devotion", () => {
       })
       .view();
 
-    console.log("Initial devotion:", initialDevotion.toString());
+    console.log("Initial devotion score:", initialDevotion.toString());
 
     const devoteTx = await program.methods
       .devote(additionalAmount)
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
+        stakeState: stateAddress,  // Changed from state to stakeState
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -260,21 +259,32 @@ describe("devotion", () => {
       .signers([userKeypair])
       .rpc();
 
-    console.log("Additional devote transaction signature:", devoteTx);
+    console.log("\nAdditional devote transaction signature:", devoteTx);
 
-    // Fetch and verify the accounts
-    const devotedAccount = await program.account.devoted.fetch(devotedAddress);
-    const totalDevotedAccount = await program.account.totalDevoted.fetch(totalDevotedAddress);
+    // Fetch and verify the accounts after the transaction
+    const finalDevotedAccount = await program.account.devoted.fetch(devotedAddress);
+    const finalTotalDevotedAccount = await program.account.totalDevoted.fetch(totalDevotedAddress);
+    const finalVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    const finalUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
+
+    console.log("\n=== Final State ===");
+    console.log("Final vault balance:", finalVaultBalance.value.uiAmount, "tokens");
+    console.log("Final user token balance:", finalUserBalance.value.uiAmount, "tokens");
+    console.log("Final devoted amount:", finalDevotedAccount.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Final residual devotion:", finalDevotedAccount.residualDevotion.toString());
+    console.log("Total devoted in program:", finalTotalDevotedAccount.totalTokens.toString(), "raw units");
 
     // Verify the total amount is now the sum of both deposits
-    const expectedTotal = new anchor.BN(150 * TOKEN_DECIMALS);
-    assert.ok(devotedAccount.amount.eq(expectedTotal), "Wrong total amount after second deposit");
-    assert.ok(totalDevotedAccount.totalTokens.eq(expectedTotal), "Wrong total devoted after second deposit");
+    const expectedTotal = new anchor.BN(1_000_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    assert.ok(finalDevotedAccount.amount.eq(expectedTotal), "Wrong total amount after second deposit");
+    assert.ok(finalTotalDevotedAccount.totalTokens.eq(expectedTotal), "Wrong total devoted after second deposit");
 
     // Verify that residual devotion was captured
     assert.ok(
-      devotedAccount.residualDevotion.gt(new anchor.BN(0)),
+      finalDevotedAccount.residualDevotion.gt(new anchor.BN(0)),
       "Residual devotion should be greater than 0"
     );
+    
+    console.log("\n=== All Assertions Passed ===");
   });
 });
