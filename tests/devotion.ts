@@ -207,16 +207,30 @@ describe("devotion", () => {
     let initialTimestamp = (await provider.connection.getBlockTime(slot)) as number;
     console.log("\nInitial timestamp:", new Date(initialTimestamp * 1000).toISOString());
 
-    // Warp approximately 2 days worth of slots
-    for (let i = 0; i < 432_000; i++) {
-      await provider.connection.minContextSlot;
+    // Create a transaction with multiple instructions to advance the clock
+    const advanceClockTx = new anchor.web3.Transaction();
+    for (let i = 0; i < 10; i++) {
+      advanceClockTx.add(
+        SystemProgram.transfer({
+          fromPubkey: admin.publicKey,
+          toPubkey: userKeypair.publicKey,
+          lamports: anchor.web3.LAMPORTS_PER_SOL / 100,
+        })
+      );
     }
-    
-    // Verify time advancement
+
+    // Send and confirm the transaction
+    const clockTx = await provider.sendAndConfirm(advanceClockTx, [admin]);
+    console.log("Clock advance transaction signature:", clockTx);
+
+    // Get new timestamp
     slot = await provider.connection.getSlot();
-    let newTimestamp = (await provider.connection.getBlockTime(slot)) as number;
+    const newTimestamp = (await provider.connection.getBlockTime(slot)) as number;
     console.log("New timestamp:", new Date(newTimestamp * 1000).toISOString());
-    console.log("Time difference:", (newTimestamp - initialTimestamp) / 3600, "hours");
+    console.log("Time difference:", (newTimestamp - initialTimestamp), "seconds");
+
+    // Add a small delay to ensure the clock has advanced
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     const additionalAmount = new anchor.BN(50 * TOKEN_DECIMALS);
 
@@ -230,7 +244,7 @@ describe("devotion", () => {
 
     console.log("Initial devotion:", initialDevotion.toString());
 
-    const tx = await program.methods
+    const devoteTx = await program.methods
       .devote(additionalAmount)
       .accounts({
         user: userKeypair.publicKey,
@@ -246,7 +260,7 @@ describe("devotion", () => {
       .signers([userKeypair])
       .rpc();
 
-    console.log("Additional devote transaction signature:", tx);
+    console.log("Additional devote transaction signature:", devoteTx);
 
     // Fetch and verify the accounts
     const devotedAccount = await program.account.devoted.fetch(devotedAddress);
