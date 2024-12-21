@@ -212,7 +212,7 @@ describe("devotion", () => {
     console.log("\n=== Initial State ===");
     console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
     console.log("Initial user token balance:", initialUserBalance.value.uiAmount, "tokens");
-    console.log("Initial devoted amount:", initialDevoted.amount.toString(), "raw units");
+    console.log("Initial devoted amount:", initialDevoted.amount.toString(), "tokens");
     console.log("Initial devoted amount (formatted):", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
     console.log("Initial residual devotion:", initialDevoted.residualDevotion.toString());
 
@@ -272,7 +272,7 @@ describe("devotion", () => {
     console.log("Final user token balance:", finalUserBalance.value.uiAmount, "tokens");
     console.log("Final devoted amount:", finalDevotedAccount.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
     console.log("Final residual devotion:", finalDevotedAccount.residualDevotion.toString());
-    console.log("Total devoted in program:", finalTotalDevotedAccount.totalTokens.toString(), "raw units");
+    console.log("Total devoted in program:", finalTotalDevotedAccount.totalTokens.toString(), "tokens");
 
     // Verify the total amount is now the sum of both deposits
     const expectedTotal = new anchor.BN(1_000_000).mul(new anchor.BN(TOKEN_DECIMALS));
@@ -285,6 +285,158 @@ describe("devotion", () => {
       "Residual devotion should be greater than 0"
     );
     
+    console.log("\n=== All Assertions Passed ===");
+  });
+
+  it("Can waver (withdraw) tokens", async () => {
+    // Get initial balances and state
+    const initialVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    const initialUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    const initialTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
+    
+    console.log("\n=== Initial State ===");
+    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
+    console.log("Initial user token balance:", initialUserBalance.value.uiAmount, "tokens");
+    console.log("Initial devoted amount:", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Initial total devoted:", initialTotalDevoted.totalTokens.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+
+    // Amount to withdraw (let's withdraw half of the devoted tokens)
+    const withdrawAmount = initialDevoted.amount.div(new anchor.BN(2));
+    console.log("\nWithdrawing amount:", withdrawAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+
+    const waverTx = await program.methods
+      .waver(withdrawAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        state: stateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    console.log("Waver transaction signature:", waverTx);
+
+    // Fetch final states
+    const finalVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    const finalUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
+    const finalDevoted = await program.account.devoted.fetch(devotedAddress);
+    const finalTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
+
+    console.log("\n=== Final State ===");
+    console.log("Final vault balance:", finalVaultBalance.value.uiAmount, "tokens");
+    console.log("Final user token balance:", finalUserBalance.value.uiAmount, "tokens");
+    console.log("Final devoted amount:", finalDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Final total devoted:", finalTotalDevoted.totalTokens.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+
+    // Verify the accounts were updated correctly
+    assert.ok(
+      finalDevoted.amount.eq(initialDevoted.amount.sub(withdrawAmount)),
+      "Devoted amount not reduced correctly"
+    );
+    
+    assert.ok(
+      finalTotalDevoted.totalTokens.eq(initialTotalDevoted.totalTokens.sub(withdrawAmount)),
+      "Total devoted not reduced correctly"
+    );
+
+    // Verify user received their tokens
+    const userBalanceDiff = new anchor.BN(finalUserBalance.value.amount)
+      .sub(new anchor.BN(initialUserBalance.value.amount));
+    assert.ok(
+      userBalanceDiff.eq(withdrawAmount),
+      "User didn't receive correct amount of tokens"
+    );
+
+    // Verify vault balance reduced
+    const vaultBalanceDiff = new anchor.BN(initialVaultBalance.value.amount)
+      .sub(new anchor.BN(finalVaultBalance.value.amount));
+    assert.ok(
+      vaultBalanceDiff.eq(withdrawAmount),
+      "Vault balance not reduced correctly"
+    );
+
+    // Verify residual devotion was reset
+    assert.equal(
+      finalDevoted.residualDevotion.toNumber(),
+      0,
+      "Residual devotion should be reset to 0"
+    );
+
+    console.log("\n=== All Assertions Passed ===");
+  });
+
+  it("Can waver (withdraw) all remaining tokens and close accounts", async () => {
+    // Get initial balances
+    const initialUserSol = await provider.connection.getBalance(userKeypair.publicKey);
+    const initialUserTokens = await provider.connection.getTokenAccountBalance(userTokenAccount);
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    const remainingAmount = initialDevoted.amount;
+
+    console.log("\n=== Initial State ===");
+    console.log("Initial user SOL balance:", initialUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
+    console.log("Initial user token balance:", initialUserTokens.value.uiAmount, "tokens");
+    console.log("Remaining tokens to withdraw:", remainingAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+
+    const waverTx = await program.methods
+      .waver(remainingAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        state: stateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    console.log("Final waver transaction signature:", waverTx);
+
+    // Get final balances
+    const finalUserSol = await provider.connection.getBalance(userKeypair.publicKey);
+    const finalUserTokens = await provider.connection.getTokenAccountBalance(userTokenAccount);
+
+    console.log("\n=== Final State ===");
+    console.log("Final user SOL balance:", finalUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
+    console.log("Final user token balance:", finalUserTokens.value.uiAmount, "tokens");
+    
+    // Verify SOL balance increased (account rent was returned)
+    assert.isTrue(
+        finalUserSol > initialUserSol,
+        "User should have received rent SOL back from closed accounts"
+    );
+    console.log("SOL returned to user:", (finalUserSol - initialUserSol) / anchor.web3.LAMPORTS_PER_SOL, "SOL");
+
+    // Verify token balance increased by the withdrawn amount
+    const tokenIncrease = new anchor.BN(finalUserTokens.value.amount)
+        .sub(new anchor.BN(initialUserTokens.value.amount));
+    assert.ok(
+        tokenIncrease.eq(remainingAmount),
+        "User token balance should have increased by the withdrawn amount"
+    );
+    console.log("Tokens returned to user:", tokenIncrease.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+
+    // Verify vault account is closed by checking if it exists
+    const vaultAccount = await provider.connection.getAccountInfo(userVaultAddress);
+    assert.isNull(vaultAccount, "Vault account should be closed");
+
+    // Verify total devoted is zero
+    const finalTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
+    assert.ok(
+        finalTotalDevoted.totalTokens.eq(new anchor.BN(0)),
+        "Total devoted should be zero"
+    );
+
     console.log("\n=== All Assertions Passed ===");
   });
 });

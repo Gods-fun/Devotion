@@ -80,13 +80,14 @@ pub mod devotion {
     }
 
     pub fn waver(ctx: Context<Waver>, amount: u64) -> Result<()> {
-        let _state = &ctx.accounts.state;
-        
+
         // Transfer from user's vault to user
-        let binding = &ctx.accounts.devoted;
+        let devoted_binding = &ctx.accounts.devoted;
+        let program_id = id();
         let seeds = &[
             b"devoted".as_ref(),
-            binding.user.as_ref(),
+            program_id.as_ref(),
+            devoted_binding.user.as_ref(),
             &[ctx.bumps.devoted],
         ];
         let signer = [&seeds[..]];
@@ -115,6 +116,7 @@ pub mod devotion {
             // Close the vault account first
             let seeds = &[
                 b"devoted".as_ref(),
+                program_id.as_ref(),
                 binding.as_ref(),
                 &[ctx.bumps.devoted],
             ];
@@ -133,16 +135,16 @@ pub mod devotion {
             close_account(cpi_ctx)?;
 
             // Then close the devoted account
-            let cpi_accounts = CloseAccount {
-                account: ctx.accounts.devoted.to_account_info(),
-                destination: ctx.accounts.user.to_account_info(),
-                authority: ctx.accounts.user.to_account_info(),
-            };
-            let cpi_ctx = CpiContext::new(
-                ctx.accounts.system_program.to_account_info(),
-                cpi_accounts,
-            );
-            close_account(cpi_ctx)?;
+            // let cpi_accounts = CloseAccount {
+            //     account: ctx.accounts.devoted.to_account_info(),
+            //     destination: ctx.accounts.user.to_account_info(),
+            //     authority: ctx.accounts.user.to_account_info(),
+            // };
+            // let cpi_ctx = CpiContext::new(
+            //     ctx.accounts.system_program.to_account_info(),
+            //     cpi_accounts,
+            // );
+            // close_account(cpi_ctx)?;
         }
 
         // Update total devoted
@@ -199,6 +201,13 @@ pub struct Devoted {
 #[derive(InitSpace)]
 pub struct TotalDevoted {
     pub total_tokens: u64,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct UserVault {
+    pub user: Pubkey,
     pub bump: u8,
 }
 
@@ -320,7 +329,6 @@ pub struct Waver<'info> {
         mut,
         seeds = [b"devoted", id().as_ref(), user.key().as_ref()],
         bump,
-        constraint = devoted.user == user.key(),
     )]
     pub devoted: Account<'info, Devoted>,
 
