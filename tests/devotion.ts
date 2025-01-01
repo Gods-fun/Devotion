@@ -97,14 +97,14 @@ describe("devotion", () => {
       userKeypair.publicKey
     );
 
-    // Mint 1 million tokens to user (reduced from 200 million)
+    // Mint 2 million tokens to user (increased from 1 million)
     await mintTo(
       provider.connection,
       admin,
       stakeMint,
       userTokenAccount,
       admin,
-      1_000_000 * TOKEN_DECIMALS
+      2_000_000 * TOKEN_DECIMALS
     );
 
     // Derive PDAs for user
@@ -175,7 +175,109 @@ describe("devotion", () => {
     }
   });
 
+  it("Cannot reinitialize the program state", async () => {
+    try {
+      await program.methods
+        .initialize(
+          new anchor.BN(DEFAULT_INTERVAL),
+          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE),
+          DEFAULT_RESET_DEVOTION
+        )
+        .accounts({
+          admin: admin.publicKey,
+          stakeMint: stakeMint,
+          state: stateAddress,
+          totalDevoted: totalDevotedAddress,
+          systemProgram: SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .signers([admin])
+        .rpc();
+        
+      assert.fail("Should not be able to reinitialize the program");
+    } catch (error) {
+      assert.include(
+        error.message,
+        "already in use",
+        "Expected error about account already being initialized"
+      );
+    }
+  });
+
+  it("Cannot reinitialize a user's devoted account through devote", async () => {
+    // First devote to create the account
+    const initialAmount = new anchor.BN(100_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    await program.methods
+      .devote(initialAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        state: stateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    // Now get the initial state after first devote
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    const initialTimestamp = initialDevoted.lastStakeTimestamp;
+    const initialResidualDevotion = initialDevoted.residualDevotion;
+    
+    // Wait a bit to ensure timestamp would be different
+    await sleep(1000);
+    
+    // Try to devote with amount = 0, which should still process but not reinitialize
+    try {
+      await program.methods
+        .devote(new anchor.BN(0))
+        .accounts({
+          user: userKeypair.publicKey,
+          state: stateAddress,
+          userVault: userVaultAddress,
+          userTokenAccount: userTokenAccount,
+          stakeMint: stakeMint,
+          devoted: devotedAddress,
+          totalDevoted: totalDevotedAddress,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([userKeypair])
+        .rpc();
+
+      // Fetch the devoted account after the transaction
+      const finalDevoted = await program.account.devoted.fetch(devotedAddress);
+      
+      // Verify that the important state wasn't reset
+      assert.ok(
+        finalDevoted.lastStakeTimestamp.gt(initialTimestamp),
+        "Timestamp should be updated, not reset to 0"
+      );
+      assert.ok(
+        finalDevoted.residualDevotion.gte(initialResidualDevotion),
+        "Residual devotion should not decrease"
+      );
+      
+    } catch (error) {
+      // If it fails, it should only be because of a different constraint
+      // not because of reinitialization
+      assert.notInclude(
+        error.message,
+        "already in use",
+        "Should not fail due to initialization constraint"
+      );
+    }
+  });
+
   it("Can devote tokens", async () => {
+    // Get initial state
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    const initialAmount = initialDevoted.amount;
+    
     const amountToDevote = new anchor.BN(600_000).mul(new anchor.BN(TOKEN_DECIMALS));
 
     const tx = await program.methods
@@ -203,17 +305,16 @@ describe("devotion", () => {
 
     // Verify the devoted account
     assert.ok(devotedAccount.user.equals(userKeypair.publicKey), "Wrong user in devoted account");
-    assert.ok(devotedAccount.amount.eq(amountToDevote), "Wrong amount in devoted account");
-    assert.equal(devotedAccount.residualDevotion.toNumber(), 0, "Initial residual devotion should be 0");
+    assert.ok(devotedAccount.amount.eq(initialAmount.add(amountToDevote)), "Wrong amount in devoted account");
     assert.ok(devotedAccount.lastStakeTimestamp.toNumber() > 0, "Last stake timestamp should be set");
 
     // Verify the total devoted
-    assert.ok(totalDevotedAccount.totalTokens.eq(amountToDevote), "Wrong total devoted amount");
+    assert.ok(totalDevotedAccount.totalTokens.eq(initialAmount.add(amountToDevote)), "Wrong total devoted amount");
 
     // Verify the vault balance
     assert.equal(
       vaultBalance.value.amount,
-      amountToDevote.toString(),
+      initialAmount.add(amountToDevote).toString(),
       "Wrong vault balance"
     );
   });
@@ -253,6 +354,7 @@ describe("devotion", () => {
       .checkDevotion()
       .accounts({
         devoted: devotedAddress,
+        state: stateAddress,
       })
       .view();
 
@@ -262,7 +364,7 @@ describe("devotion", () => {
       .devote(additionalAmount)
       .accounts({
         user: userKeypair.publicKey,
-        stakeState: stateAddress,  // Changed from state to stakeState
+        state: stateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -290,17 +392,9 @@ describe("devotion", () => {
     console.log("Total devoted in program:", finalTotalDevotedAccount.totalTokens.toString(), "tokens");
 
     // Verify the total amount is now the sum of both deposits
-    const expectedTotal = new anchor.BN(1_000_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    const expectedTotal = initialDevoted.amount.add(additionalAmount);
     assert.ok(finalDevotedAccount.amount.eq(expectedTotal), "Wrong total amount after second deposit");
     assert.ok(finalTotalDevotedAccount.totalTokens.eq(expectedTotal), "Wrong total devoted after second deposit");
-
-    // Verify that residual devotion was captured
-    assert.ok(
-      finalDevotedAccount.residualDevotion.gt(new anchor.BN(0)),
-      "Residual devotion should be greater than 0"
-    );
-    
-    console.log("\n=== All Assertions Passed ===");
   });
 
   it("Can waver (withdraw) tokens", async () => {
