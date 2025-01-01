@@ -9,6 +9,11 @@ const TOKEN_DECIMALS = 1_000_000_000; // 10^9
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const SECONDS_PER_DAY = 86_400;
+const DEFAULT_INTERVAL = SECONDS_PER_DAY; // 1 day in seconds
+const DEFAULT_MAX_DEVOTION_CHARGE = SECONDS_PER_DAY * 180; // 180 days in seconds
+const DEFAULT_RESET_DEVOTION = true;
+
 describe("devotion", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -104,12 +109,12 @@ describe("devotion", () => {
 
     // Derive PDAs for user
     [userVaultAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), program.programId.toBytes(), userKeypair.publicKey.toBytes()],
+      [Buffer.from("vault"), userKeypair.publicKey.toBytes()],
       program.programId
     );
 
     [devotedAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("devoted"), program.programId.toBytes(), userKeypair.publicKey.toBytes()],
+      [Buffer.from("devoted"), userKeypair.publicKey.toBytes()],
       program.programId
     );
   });
@@ -117,7 +122,11 @@ describe("devotion", () => {
   it("Initializes the program state", async () => {
     try {
       const tx = await program.methods
-        .initialize()
+        .initialize(
+          new anchor.BN(DEFAULT_INTERVAL),
+          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE),
+          DEFAULT_RESET_DEVOTION
+        )
         .accounts({
           admin: admin.publicKey,
           stakeMint: stakeMint,
@@ -140,6 +149,9 @@ describe("devotion", () => {
       console.log("\nState Account Data:");
       console.log("- Admin:", stateAccount.admin.toString());
       console.log("- Stake Mint:", stateAccount.stakeMint.toString());
+      console.log("- Interval:", stateAccount.interval.toString(), "seconds");
+      console.log("- Max Devotion Charge:", stateAccount.maxDevotionCharge.toString(), "seconds");
+      console.log("- Reset Devotion:", stateAccount.resetDevotion);
       console.log("- Bump:", stateAccount.bump);
 
       console.log("\nTotal Devoted Account Data:");
@@ -149,6 +161,9 @@ describe("devotion", () => {
       // Verify the accounts were initialized correctly
       assert.ok(stateAccount.admin.equals(admin.publicKey), "Admin public key mismatch");
       assert.ok(stateAccount.stakeMint.equals(stakeMint), "Stake mint mismatch");
+      assert.ok(stateAccount.interval.eq(new anchor.BN(DEFAULT_INTERVAL)), "Interval mismatch");
+      assert.ok(stateAccount.maxDevotionCharge.eq(new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE)), "Max devotion charge mismatch");
+      assert.equal(stateAccount.resetDevotion, DEFAULT_RESET_DEVOTION, "Reset devotion mismatch");
       assert.equal(totalDevotedAccount.totalTokens.toString(), "0", "Total tokens should be 0");
       
       console.log("Your transaction signature", tx);
@@ -372,23 +387,23 @@ describe("devotion", () => {
     console.log("\n=== All Assertions Passed ===");
   });
 
-  it("Can waver (withdraw) all remaining tokens and close accounts", async () => {
+  it("Can commit heresy (close all accounts)", async () => {
     // Get initial balances
     const initialUserSol = await provider.connection.getBalance(userKeypair.publicKey);
     const initialUserTokens = await provider.connection.getTokenAccountBalance(userTokenAccount);
     const initialDevoted = await program.account.devoted.fetch(devotedAddress);
-    const remainingAmount = initialDevoted.amount;
+    const initialVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
 
     console.log("\n=== Initial State ===");
     console.log("Initial user SOL balance:", initialUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
     console.log("Initial user token balance:", initialUserTokens.value.uiAmount, "tokens");
-    console.log("Remaining tokens to withdraw:", remainingAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
+    console.log("Initial devoted amount:", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString());
 
-    const waverTx = await program.methods
-      .waver(remainingAmount)
+    const heresyTx = await program.methods
+      .heresy()
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -400,7 +415,7 @@ describe("devotion", () => {
       .signers([userKeypair])
       .rpc();
 
-    console.log("Final waver transaction signature:", waverTx);
+    console.log("Heresy transaction signature:", heresyTx);
 
     // Get final balances
     const finalUserSol = await provider.connection.getBalance(userKeypair.publicKey);
@@ -410,27 +425,27 @@ describe("devotion", () => {
     console.log("Final user SOL balance:", finalUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
     console.log("Final user token balance:", finalUserTokens.value.uiAmount, "tokens");
     
-    // Verify SOL balance increased (account rent was returned)
+    // Verify SOL balance increased (account rent was returned from devoted account)
     assert.isTrue(
         finalUserSol > initialUserSol,
-        "User should have received rent SOL back from closed accounts"
+        "User should have received rent SOL back from closed devoted account"
     );
     console.log("SOL returned to user:", (finalUserSol - initialUserSol) / anchor.web3.LAMPORTS_PER_SOL, "SOL");
 
-    // Verify token balance increased by the withdrawn amount
+    // Verify token balance increased by the vault's tokens
     const tokenIncrease = new anchor.BN(finalUserTokens.value.amount)
         .sub(new anchor.BN(initialUserTokens.value.amount));
     assert.ok(
-        tokenIncrease.eq(remainingAmount),
-        "User token balance should have increased by the withdrawn amount"
+        tokenIncrease.eq(initialDevoted.amount),
+        "User token balance should have increased by the vault amount"
     );
     console.log("Tokens returned to user:", tokenIncrease.div(new anchor.BN(TOKEN_DECIMALS)).toString());
 
-    // Verify vault account is closed by checking if it exists
-    const vaultAccount = await provider.connection.getAccountInfo(userVaultAddress);
-    assert.isNull(vaultAccount, "Vault account should be closed");
+    // Verify devoted account is closed
+    const devotedAccount = await provider.connection.getAccountInfo(devotedAddress);
+    assert.isNull(devotedAccount, "Devoted account should be closed");
 
-    // Verify total devoted is zero
+    // Verify total devoted is updated
     const finalTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
     assert.ok(
         finalTotalDevoted.totalTokens.eq(new anchor.BN(0)),

@@ -7,18 +7,27 @@ use anchor_spl::{
 declare_id!("FMzU5SZEeAnP9ts9DZ9rJuFyimTfshwjQp4A3Kjm6Kf7");
 
 pub const SECONDS_PER_DAY: i64 = 86_400;
-pub const MAX_MULTIPLIER_SECONDS: i64 = SECONDS_PER_DAY * 180; // 180 days in seconds
 pub const TOKEN_DECIMALS: u64 = 1_000_000_000; // 10^9
 
 #[program]
 pub mod devotion {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(
+        ctx: Context<Initialize>, 
+        interval: i64,
+        max_devotion_charge: i64,
+        reset_devotion: bool
+    ) -> Result<()> {
         let state = &mut ctx.accounts.stake_state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
         state.bump = ctx.bumps.stake_state;
+        
+        // Set the configurable parameters
+        state.interval = interval;
+        state.max_devotion_charge = max_devotion_charge;
+        state.reset_devotion = reset_devotion;
         
         // Initialize total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
@@ -36,16 +45,16 @@ pub mod devotion {
             let current_time = Clock::get()?.unix_timestamp;
             let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
             
-            // Cap the seconds at maximum multiplier
-            let capped_seconds = std::cmp::min(seconds_staked, MAX_MULTIPLIER_SECONDS);
+            // Cap the seconds at maximum multiplier using state value
+            let capped_seconds = std::cmp::min(seconds_staked, ctx.accounts.state.max_devotion_charge);
             
-            // Calculate devotion from existing stake
+            // Calculate devotion using interval from state
             let devotion = (capped_seconds as u64)
                 .checked_mul(devoted.amount)
                 .unwrap_or(0)
                 .checked_div(TOKEN_DECIMALS)
                 .unwrap_or(0)
-                .checked_div(SECONDS_PER_DAY as u64)
+                .checked_div(ctx.accounts.state.interval as u64)  // Use interval instead of SECONDS_PER_DAY
                 .unwrap_or(0);
                 
             // Add to residual devotion
@@ -80,13 +89,10 @@ pub mod devotion {
     }
 
     pub fn waver(ctx: Context<Waver>, amount: u64) -> Result<()> {
-
         // Transfer from user's vault to user
         let devoted_binding = &ctx.accounts.devoted;
-        let program_id = id();
         let seeds = &[
             b"devoted".as_ref(),
-            program_id.as_ref(),
             devoted_binding.user.as_ref(),
             &[ctx.bumps.devoted],
         ];
@@ -106,45 +112,12 @@ pub mod devotion {
         let devoted = &mut ctx.accounts.devoted;
         devoted.amount = devoted.amount.checked_sub(amount).unwrap();
         
-        // Reset timestamp to current time and clear residual devotion
+        // Reset timestamp to current time
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
-        devoted.residual_devotion = 0;
-
-        // If user has removed all tokens, close their devoted account and vault
-        if devoted.amount == 0 {
-            let binding = ctx.accounts.user.key();
-            // Close the vault account first
-            let seeds = &[
-                b"devoted".as_ref(),
-                program_id.as_ref(),
-                binding.as_ref(),
-                &[ctx.bumps.devoted],
-            ];
-            let signer = [&seeds[..]];
-            
-            let cpi_accounts = CloseAccount {
-                account: ctx.accounts.user_vault.to_account_info(),
-                destination: ctx.accounts.user.to_account_info(),
-                authority: ctx.accounts.devoted.to_account_info(),
-            };
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                cpi_accounts,
-                &signer
-            );
-            close_account(cpi_ctx)?;
-
-            // Then close the devoted account
-            // let cpi_accounts = CloseAccount {
-            //     account: ctx.accounts.devoted.to_account_info(),
-            //     destination: ctx.accounts.user.to_account_info(),
-            //     authority: ctx.accounts.user.to_account_info(),
-            // };
-            // let cpi_ctx = CpiContext::new(
-            //     ctx.accounts.system_program.to_account_info(),
-            //     cpi_accounts,
-            // );
-            // close_account(cpi_ctx)?;
+        
+        // Only reset residual_devotion if reset_devotion is true
+        if ctx.accounts.state.reset_devotion {
+            devoted.residual_devotion = 0;
         }
 
         // Update total devoted
@@ -154,21 +127,54 @@ pub mod devotion {
         Ok(())
     }
 
+    pub fn heresy(ctx: Context<Heresy>) -> Result<()> {
+        // If there are tokens in the vault, transfer them back to user
+        if ctx.accounts.user_vault.amount > 0 {
+            // Transfer all tokens from vault to user
+            let devoted_binding = &ctx.accounts.devoted;
+            let seeds = &[
+                b"devoted".as_ref(),
+                devoted_binding.user.as_ref(),
+                &[ctx.bumps.devoted],
+            ];
+            let signer = [&seeds[..]];
+            
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.user_vault.to_account_info(),
+                to: ctx.accounts.user_token_account.to_account_info(),
+                authority: ctx.accounts.devoted.to_account_info(),
+            };
+            
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, &signer);
+            transfer(cpi_ctx, ctx.accounts.user_vault.amount)?;
+
+            // Update total devoted
+            let total_devoted = &mut ctx.accounts.total_devoted;
+            total_devoted.total_tokens = total_devoted.total_tokens
+                .checked_sub(ctx.accounts.user_vault.amount)
+                .unwrap();
+        }
+
+        Ok(())
+    }
+
     pub fn check_devotion(ctx: Context<CheckDevotion>) -> Result<u64> {
         let devoted = &ctx.accounts.devoted;
+        let state = &ctx.accounts.state;
         let current_time = Clock::get()?.unix_timestamp;
         let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
         
-        // Cap the seconds at maximum multiplier
-        let capped_seconds = std::cmp::min(seconds_staked, MAX_MULTIPLIER_SECONDS);
+        // Cap the seconds at maximum multiplier using state value
+        let capped_seconds = std::cmp::min(seconds_staked, state.max_devotion_charge);
         
-        // Calculate devotion: (seconds_staked * amount) / (token_decimals * seconds_per_day)
+        // Calculate devotion using interval from state
         let devotion = (capped_seconds as u64)
             .checked_mul(devoted.amount)
             .unwrap_or(0)
             .checked_div(TOKEN_DECIMALS)
             .unwrap_or(0)
-            .checked_div(SECONDS_PER_DAY as u64)  // Normalize to devotion per day
+            .checked_div(state.interval as u64)  // Use interval instead of SECONDS_PER_DAY
             .unwrap_or(0);
             
         let total_devotion = devotion
@@ -185,6 +191,9 @@ pub struct StakeState {
     pub admin: Pubkey,
     pub stake_mint: Pubkey,
     pub bump: u8,
+    pub interval: i64,
+    pub max_devotion_charge: i64,
+    pub reset_devotion: bool,
 }
 
 #[account]
@@ -255,7 +264,7 @@ pub struct Devote<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        seeds = [b"vault", id().as_ref(), user.key().as_ref()],
+        seeds = [b"vault", user.key().as_ref()],
         bump,
         token::mint = stake_mint,
         token::authority = devoted,
@@ -278,7 +287,7 @@ pub struct Devote<'info> {
         init_if_needed,
         payer = user,
         space = 8 + Devoted::INIT_SPACE,
-        seeds = [b"devoted", id().as_ref(), user.key().as_ref()],
+        seeds = [b"devoted", user.key().as_ref()],
         bump,
     )]
     pub devoted: Account<'info, Devoted>,
@@ -308,7 +317,7 @@ pub struct Waver<'info> {
 
     #[account(
         mut,
-        seeds = [b"vault", id().as_ref(), user.key().as_ref()],
+        seeds = [b"vault", user.key().as_ref()],
         bump,
         token::mint = stake_mint,
         token::authority = devoted,
@@ -327,7 +336,7 @@ pub struct Waver<'info> {
 
     #[account(
         mut,
-        seeds = [b"devoted", id().as_ref(), user.key().as_ref()],
+        seeds = [b"devoted", user.key().as_ref()],
         bump,
     )]
     pub devoted: Account<'info, Devoted>,
@@ -346,4 +355,51 @@ pub struct Waver<'info> {
 #[derive(Accounts)]
 pub struct CheckDevotion<'info> {
     pub devoted: Account<'info, Devoted>,
+    #[account(
+        seeds = [b"state", id().as_ref()],
+        bump
+    )]
+    pub state: Account<'info, StakeState>,
+}
+
+#[derive(Accounts)]
+pub struct Heresy<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"vault", user.key().as_ref()],
+        bump,
+        token::mint = stake_mint,
+        token::authority = devoted,
+    )]
+    pub user_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::mint = stake_mint,
+        associated_token::authority = user,
+    )]
+    pub user_token_account: Account<'info, TokenAccount>,
+
+    pub stake_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        seeds = [b"devoted", user.key().as_ref()],
+        bump,
+        close = user
+    )]
+    pub devoted: Account<'info, Devoted>,
+
+    #[account(
+        mut,
+        seeds = [b"total_devoted", id().as_ref()],
+        bump,
+    )]
+    pub total_devoted: Account<'info, TotalDevoted>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
