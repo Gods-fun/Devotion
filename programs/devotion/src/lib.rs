@@ -1,13 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    // associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount, Transfer, transfer, CloseAccount, close_account},
-};
+use anchor_spl::token::{Mint, Token, TokenAccount, Transfer, transfer};
 
 declare_id!("FMzU5SZEeAnP9ts9DZ9rJuFyimTfshwjQp4A3Kjm6Kf7");
-
-pub const SECONDS_PER_DAY: i64 = 86_400;
-pub const TOKEN_DECIMALS: u64 = 1_000_000_000; // 10^9
 
 #[program]
 pub mod devotion {
@@ -23,6 +17,9 @@ pub mod devotion {
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
         state.bump = ctx.bumps.stake_state;
+        
+        // Store the token's decimals
+        state.decimals = ctx.accounts.stake_mint.decimals;
         
         // Set the configurable parameters
         state.interval = interval;
@@ -48,13 +45,14 @@ pub mod devotion {
             // Cap the seconds at maximum multiplier using state value
             let capped_seconds = std::cmp::min(seconds_staked, ctx.accounts.state.max_devotion_charge);
             
-            // Calculate devotion using interval from state
+            // Calculate devotion using actual token decimals
+            let decimals_multiplier = 10u64.pow(ctx.accounts.state.decimals as u32);
             let devotion = (capped_seconds as u64)
                 .checked_mul(devoted.amount)
                 .unwrap_or(0)
-                .checked_div(TOKEN_DECIMALS)
+                .checked_div(decimals_multiplier)
                 .unwrap_or(0)
-                .checked_div(ctx.accounts.state.interval as u64)  // Use interval instead of SECONDS_PER_DAY
+                .checked_div(ctx.accounts.state.interval as u64)
                 .unwrap_or(0);
                 
             // Add to residual devotion
@@ -168,13 +166,14 @@ pub mod devotion {
         // Cap the seconds at maximum multiplier using state value
         let capped_seconds = std::cmp::min(seconds_staked, state.max_devotion_charge);
         
-        // Calculate devotion using interval from state
+        // Calculate devotion using actual token decimals
+        let decimals_multiplier = 10u64.pow(state.decimals as u32);
         let devotion = (capped_seconds as u64)
             .checked_mul(devoted.amount)
             .unwrap_or(0)
-            .checked_div(TOKEN_DECIMALS)
+            .checked_div(decimals_multiplier)
             .unwrap_or(0)
-            .checked_div(state.interval as u64)  // Use interval instead of SECONDS_PER_DAY
+            .checked_div(state.interval as u64)
             .unwrap_or(0);
             
         let total_devotion = devotion
@@ -194,6 +193,7 @@ pub struct StakeState {
     pub interval: i64,
     pub max_devotion_charge: i64,
     pub reset_devotion: bool,
+    pub decimals: u8,
 }
 
 #[account]
