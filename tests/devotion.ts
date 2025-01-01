@@ -454,4 +454,157 @@ describe("devotion", () => {
 
     console.log("\n=== All Assertions Passed ===");
   });
+
+  it("Cannot devote on behalf of another user", async () => {
+    // Create a second user
+    const maliciousUser = Keypair.generate();
+    
+    // Airdrop SOL to malicious user
+    const airdropSig = await provider.connection.requestAirdrop(
+      maliciousUser.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(airdropSig);
+
+    // Create token account for malicious user
+    const maliciousTokenAccount = await createAssociatedTokenAccount(
+      provider.connection,
+      maliciousUser,
+      stakeMint,
+      maliciousUser.publicKey
+    );
+
+    // Mint some tokens to malicious user
+    await mintTo(
+      provider.connection,
+      admin,
+      stakeMint,
+      maliciousTokenAccount,
+      admin,
+      100_000 * TOKEN_DECIMALS
+    );
+
+    // Try to devote tokens to the original user's vault
+    const amountToDevote = new anchor.BN(50_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    
+    try {
+      await program.methods
+        .devote(amountToDevote)
+        .accounts({
+          user: maliciousUser.publicKey,
+          state: stateAddress,
+          userVault: userVaultAddress, // Trying to use original user's vault
+          userTokenAccount: maliciousTokenAccount,
+          stakeMint: stakeMint,
+          devoted: devotedAddress, // Trying to use original user's devoted account
+          totalDevoted: totalDevotedAddress,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([maliciousUser])
+        .rpc();
+      
+      assert.fail("Should not be able to devote to another user's vault");
+    } catch (error) {
+      assert.include(
+        error.message,
+        "AnchorError caused by account: user_v",
+        "Expected Anchor error due to invalid vault account"
+      );
+    }
+  });
+
+  it("Cannot waver another user's tokens", async () => {
+    // Create a second user
+    const maliciousUser = Keypair.generate();
+    
+    // Airdrop SOL to malicious user
+    const airdropSig = await provider.connection.requestAirdrop(
+      maliciousUser.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(airdropSig);
+
+    // Create token account for malicious user
+    const maliciousTokenAccount = await createAssociatedTokenAccount(
+      provider.connection,
+      maliciousUser,
+      stakeMint,
+      maliciousUser.publicKey
+    );
+
+    // Try to withdraw from original user's vault
+    const withdrawAmount = new anchor.BN(50_000).mul(new anchor.BN(TOKEN_DECIMALS));
+    
+    try {
+      await program.methods
+        .waver(withdrawAmount)
+        .accounts({
+          user: maliciousUser.publicKey,
+          state: stateAddress,
+          userVault: userVaultAddress, // Trying to use original user's vault
+          userTokenAccount: maliciousTokenAccount,
+          stakeMint: stakeMint,
+          devoted: devotedAddress, // Trying to use original user's devoted account
+          totalDevoted: totalDevotedAddress,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([maliciousUser])
+        .rpc();
+      
+      assert.fail("Should not be able to waver another user's tokens");
+    } catch (error) {
+      assert.include(
+        error.message,
+        "AnchorError caused by account: devoted",
+        "Expected Anchor error due to invalid devoted account"
+      );
+    }
+  });
+
+  it("Cannot commit heresy on another user's accounts", async () => {
+    // Create a second user
+    const maliciousUser = Keypair.generate();
+    
+    // Airdrop SOL to malicious user
+    const airdropSig = await provider.connection.requestAirdrop(
+      maliciousUser.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(airdropSig);
+
+    // Create token account for malicious user
+    const maliciousTokenAccount = await createAssociatedTokenAccount(
+      provider.connection,
+      maliciousUser,
+      stakeMint,
+      maliciousUser.publicKey
+    );
+
+    try {
+      await program.methods
+        .heresy()
+        .accounts({
+          user: maliciousUser.publicKey,
+          userVault: userVaultAddress, // Trying to use original user's vault
+          userTokenAccount: maliciousTokenAccount,
+          stakeMint: stakeMint,
+          devoted: devotedAddress, // Trying to use original user's devoted account
+          totalDevoted: totalDevotedAddress,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([maliciousUser])
+        .rpc();
+      
+      assert.fail("Should not be able to commit heresy on another user's accounts");
+    } catch (error) {
+      assert.include(
+        error.message,
+        "AnchorError caused by account: devoted",
+        "Expected Anchor error due to invalid devoted account"
+      );
+    }
+  });
 });

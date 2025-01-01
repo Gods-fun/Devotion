@@ -239,7 +239,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + TotalDevoted::INIT_SPACE, // discriminator + u64
+        space = 8 + TotalDevoted::INIT_SPACE,
         seeds = [b"total_devoted", id().as_ref()],
         bump,
     )]
