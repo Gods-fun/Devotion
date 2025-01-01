@@ -231,7 +231,7 @@ pub struct Initialize<'info> {
         init,
         payer = admin,
         space = 8 + StakeState::INIT_SPACE,
-        seeds = [b"state", id().as_ref()],
+        seeds = [b"state"],
         bump,
     )]
     pub stake_state: Account<'info, StakeState>,
@@ -240,7 +240,7 @@ pub struct Initialize<'info> {
         init,
         payer = admin,
         space = 8 + TotalDevoted::INIT_SPACE,
-        seeds = [b"total_devoted", id().as_ref()],
+        seeds = [b"total_devoted"],
         bump,
     )]
     pub total_devoted: Account<'info, TotalDevoted>,
@@ -255,7 +255,7 @@ pub struct Devote<'info> {
     pub user: Signer<'info>,
 
     #[account(
-        seeds = [b"state", id().as_ref()],
+        seeds = [b"state"],
         bump,
         constraint = state.stake_mint == stake_mint.key(),
     )]
@@ -294,7 +294,7 @@ pub struct Devote<'info> {
 
     #[account(
         mut,
-        seeds = [b"total_devoted", id().as_ref()],
+        seeds = [b"total_devoted"],
         bump
     )]
     pub total_devoted: Account<'info, TotalDevoted>,
@@ -309,7 +309,7 @@ pub struct Waver<'info> {
     pub user: Signer<'info>,
 
     #[account(
-        seeds = [b"state", id().as_ref()],
+        seeds = [b"state"],
         bump,
         constraint = state.stake_mint == stake_mint.key(),
     )]
@@ -343,7 +343,7 @@ pub struct Waver<'info> {
 
     #[account(
         mut,
-        seeds = [b"total_devoted", id().as_ref()],
+        seeds = [b"total_devoted"],
         bump,
     )]
     pub total_devoted: Account<'info, TotalDevoted>,
@@ -356,7 +356,7 @@ pub struct Waver<'info> {
 pub struct CheckDevotion<'info> {
     pub devoted: Account<'info, Devoted>,
     #[account(
-        seeds = [b"state", id().as_ref()],
+        seeds = [b"state"],
         bump
     )]
     pub state: Account<'info, StakeState>,
@@ -395,7 +395,7 @@ pub struct Heresy<'info> {
 
     #[account(
         mut,
-        seeds = [b"total_devoted", id().as_ref()],
+        seeds = [b"total_devoted"],
         bump,
     )]
     pub total_devoted: Account<'info, TotalDevoted>,

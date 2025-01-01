@@ -62,13 +62,13 @@ describe("devotion", () => {
     // Derive PDAs
     console.log("\nDeriving Program PDAs...");
     [stateAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("state"), program.programId.toBytes()],
+      [Buffer.from("state")],
       program.programId
     );
     console.log("State PDA:", stateAddress.toString());
     
     [totalDevotedAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("total_devoted"), program.programId.toBytes()],
+      [Buffer.from("total_devoted")],
       program.programId
     );
     console.log("Total Devoted PDA:", totalDevotedAddress.toString());
@@ -397,7 +397,7 @@ describe("devotion", () => {
     assert.ok(finalTotalDevotedAccount.totalTokens.eq(expectedTotal), "Wrong total devoted after second deposit");
   });
 
-  it("Can waver (withdraw) tokens", async () => {
+  it("Can waver", async () => {
     // Get initial balances and state
     const initialVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
     const initialUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
@@ -481,7 +481,7 @@ describe("devotion", () => {
     console.log("\n=== All Assertions Passed ===");
   });
 
-  it("Can commit heresy (close all accounts)", async () => {
+  it("Can commit heresy", async () => {
     // Get initial balances
     const initialUserSol = await provider.connection.getBalance(userKeypair.publicKey);
     const initialUserTokens = await provider.connection.getTokenAccountBalance(userTokenAccount);
