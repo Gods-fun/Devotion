@@ -24,7 +24,7 @@ describe("devotion", () => {
   let stakeMint: PublicKey;
   
   // PDAs we'll need
-  let stateAddress: PublicKey;
+  let stakeStateAddress: PublicKey;
   let totalDevotedAddress: PublicKey;
   
   // Add these variables after the existing ones
@@ -60,11 +60,11 @@ describe("devotion", () => {
     
     // Derive PDAs
     console.log("\nDeriving Program PDAs...");
-    [stateAddress] = PublicKey.findProgramAddressSync(
+    [stakeStateAddress] = PublicKey.findProgramAddressSync(
       [Buffer.from("state")],
       program.programId
     );
-    console.log("State PDA:", stateAddress.toString());
+    console.log("State PDA:", stakeStateAddress.toString());
     
     [totalDevotedAddress] = PublicKey.findProgramAddressSync(
       [Buffer.from("total_devoted")],
@@ -128,7 +128,7 @@ describe("devotion", () => {
         .accounts({
           admin: admin.publicKey,
           stakeMint: stakeMint,
-          state: stateAddress,
+          stakeState: stakeStateAddress,
           totalDevoted: totalDevotedAddress,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -141,7 +141,7 @@ describe("devotion", () => {
 
       // Fetch and log the created accounts
       console.log("\n=== Fetching Created Accounts ===");
-      const stateAccount = await program.account.stakeState.fetch(stateAddress);
+      const stateAccount = await program.account.stakeState.fetch(stakeStateAddress);
       const totalDevotedAccount = await program.account.totalDevoted.fetch(totalDevotedAddress);
       
       console.log("\nState Account Data:");
@@ -149,11 +149,10 @@ describe("devotion", () => {
       console.log("- Stake Mint:", stateAccount.stakeMint.toString());
       console.log("- Interval:", stateAccount.interval.toString(), "seconds");
       console.log("- Max Devotion Charge:", stateAccount.maxDevotionCharge.toString(), "seconds");
-      console.log("- Bump:", stateAccount.bump);
 
       console.log("\nTotal Devoted Account Data:");
       console.log("- Total Tokens:", totalDevotedAccount.totalTokens.toString());
-      console.log("- Bump:", totalDevotedAccount.bump);
+      assert.equal(totalDevotedAccount.totalTokens.toString(), "0", "Total tokens should be 0");
       
       // Verify the accounts were initialized correctly
       assert.ok(stateAccount.admin.equals(admin.publicKey), "Admin public key mismatch");
@@ -181,7 +180,7 @@ describe("devotion", () => {
         .accounts({
           admin: admin.publicKey,
           stakeMint: stakeMint,
-          state: stateAddress,
+          stakeState: stakeStateAddress,
           totalDevoted: totalDevotedAddress,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -206,7 +205,7 @@ describe("devotion", () => {
       .devote(initialAmount)
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
+        stakeState: stakeStateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -232,7 +231,7 @@ describe("devotion", () => {
         .devote(new anchor.BN(0))
         .accounts({
           user: userKeypair.publicKey,
-          state: stateAddress,
+          stakeState: stakeStateAddress,
           userVault: userVaultAddress,
           userTokenAccount: userTokenAccount,
           stakeMint: stakeMint,
@@ -279,7 +278,7 @@ describe("devotion", () => {
       .devote(amountToDevote)
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
+        stakeState: stakeStateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -349,7 +348,7 @@ describe("devotion", () => {
       .checkDevotion()
       .accounts({
         devoted: devotedAddress,
-        state: stateAddress,
+        stakeState: stakeStateAddress,
       })
       .view();
 
@@ -359,7 +358,7 @@ describe("devotion", () => {
       .devote(additionalAmount)
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
+        stakeState: stakeStateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -413,7 +412,7 @@ describe("devotion", () => {
       .waver(withdrawAmount)
       .accounts({
         user: userKeypair.publicKey,
-        state: stateAddress,
+        stakeState: stakeStateAddress,
         userVault: userVaultAddress,
         userTokenAccount: userTokenAccount,
         stakeMint: stakeMint,
@@ -581,7 +580,7 @@ describe("devotion", () => {
         .devote(amountToDevote)
         .accounts({
           user: maliciousUser.publicKey,
-          state: stateAddress,
+          stakeState: stakeStateAddress,
           userVault: userVaultAddress, // Trying to use original user's vault
           userTokenAccount: maliciousTokenAccount,
           stakeMint: stakeMint,
@@ -630,7 +629,7 @@ describe("devotion", () => {
         .waver(withdrawAmount)
         .accounts({
           user: maliciousUser.publicKey,
-          state: stateAddress,
+          stakeState: stakeStateAddress,
           userVault: userVaultAddress, // Trying to use original user's vault
           userTokenAccount: maliciousTokenAccount,
           stakeMint: stakeMint,

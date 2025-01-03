@@ -48,9 +48,7 @@ pub mod devotion {
     }
 
     pub fn devote(ctx: Context<Devote>, amount: u64) -> Result<()> {
-
         if amount == 0 {
-            // custom error
             return Err(ErrorCode::AmountZero.into());
         }
 
@@ -61,30 +59,35 @@ pub mod devotion {
             let current_time = Clock::get()?.unix_timestamp;
             let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
             
-            // Cap the seconds at maximum multiplier using state value
-            let capped_seconds = std::cmp::min(seconds_staked, ctx.accounts.state.max_devotion_charge);
+            // Cap the seconds at maximum multiplier using stake_state value
+            let capped_seconds = std::cmp::min(seconds_staked, ctx.accounts.stake_state.max_devotion_charge);
             
-            // Calculate devotion using u128
-            let decimals_multiplier = 10u128.pow(ctx.accounts.state.decimals as u32);
-            let devotion = (capped_seconds as u128)
+            // Calculate current devotion using u128
+            let decimals_multiplier = 10u128.pow(ctx.accounts.stake_state.decimals as u32);
+            let calculated_devotion = (capped_seconds as u128)
                 .checked_mul(devoted.amount as u128)
                 .ok_or(ErrorCode::MathOverflow)?
                 .checked_div(decimals_multiplier)
                 .ok_or(ErrorCode::DivError)?
-                .checked_div(ctx.accounts.state.interval as u128)
+                .checked_div(ctx.accounts.stake_state.interval as u128)
                 .ok_or(ErrorCode::DivError)?;
+                
+            // Add residual_devotion to get current_devotion
+            let current_devotion = calculated_devotion
+                .checked_add(devoted.residual_devotion)
+                .ok_or(ErrorCode::MathOverflow)?;
                 
             // Calculate max_devotion using u128
             let max_devotion = (devoted.amount as u128)
-                .checked_mul(ctx.accounts.state.max_devotion_charge as u128)
+                .checked_mul(ctx.accounts.stake_state.max_devotion_charge as u128)
                 .ok_or(ErrorCode::MathOverflow)?
                 .checked_div(decimals_multiplier)
                 .ok_or(ErrorCode::DivError)?
-                .checked_div(ctx.accounts.state.interval as u128)
+                .checked_div(ctx.accounts.stake_state.interval as u128)
                 .ok_or(ErrorCode::DivError)?;
                 
-            // Cap residual_devotion at max_devotion
-            devoted.residual_devotion = std::cmp::min(devoted.residual_devotion, max_devotion);
+            // Store the capped current_devotion as residual_devotion
+            devoted.residual_devotion = std::cmp::min(current_devotion, max_devotion);
         } else {
             // Initialize user data if this is their first stake
             devoted.user = ctx.accounts.user.key();
@@ -207,21 +210,21 @@ pub mod devotion {
 
     pub fn check_devotion(ctx: Context<CheckDevotion>) -> Result<u128> {
         let devoted = &ctx.accounts.devoted;
-        let state = &ctx.accounts.state;
+        let stake_state = &ctx.accounts.stake_state;
         let current_time = Clock::get()?.unix_timestamp;
         let seconds_staked = current_time.saturating_sub(devoted.last_stake_timestamp);
         
-        // Cap the seconds at maximum multiplier using state value
-        let capped_seconds = std::cmp::min(seconds_staked, state.max_devotion_charge);
+        // Cap the seconds at maximum multiplier using stake_state value
+        let capped_seconds = std::cmp::min(seconds_staked, stake_state.max_devotion_charge);
         
         // Calculate using u128
-        let decimals_multiplier = 10u128.pow(state.decimals as u32);
+        let decimals_multiplier = 10u128.pow(stake_state.decimals as u32);
         let max_devotion = (devoted.amount as u128)
-            .checked_mul(state.max_devotion_charge as u128)
+            .checked_mul(stake_state.max_devotion_charge as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(decimals_multiplier)
             .ok_or(ErrorCode::DivError)?
-            .checked_div(state.interval as u128)
+            .checked_div(stake_state.interval as u128)
             .ok_or(ErrorCode::DivError)?;
         
         // Calculate current devotion
@@ -230,7 +233,7 @@ pub mod devotion {
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(decimals_multiplier)
             .ok_or(ErrorCode::DivError)?
-            .checked_div(state.interval as u128)
+            .checked_div(stake_state.interval as u128)
             .ok_or(ErrorCode::DivError)?;
             
         let total_devotion = devotion
@@ -305,9 +308,9 @@ pub struct Devote<'info> {
     #[account(
         seeds = [b"state"],
         bump,
-        constraint = state.stake_mint == stake_mint.key(),
+        constraint = stake_state.stake_mint == stake_mint.key(),
     )]
-    pub state: Account<'info, StakeState>,
+    pub stake_state: Account<'info, StakeState>,
 
     #[account(
         init_if_needed,
@@ -327,7 +330,7 @@ pub struct Devote<'info> {
     pub user_token_account: Account<'info, TokenAccount>,
 
     #[account(
-        constraint = state.stake_mint == stake_mint.key()
+        constraint = stake_state.stake_mint == stake_mint.key()
     )]
     pub stake_mint: Account<'info, Mint>,
 
@@ -359,9 +362,9 @@ pub struct Waver<'info> {
     #[account(
         seeds = [b"state"],
         bump,
-        constraint = state.stake_mint == stake_mint.key(),
+        constraint = stake_state.stake_mint == stake_mint.key(),
     )]
-    pub state: Account<'info, StakeState>,
+    pub stake_state: Account<'info, StakeState>,
 
     #[account(
         mut,
@@ -379,7 +382,7 @@ pub struct Waver<'info> {
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
-    #[account(constraint = state.stake_mint == stake_mint.key())]
+    #[account(constraint = stake_state.stake_mint == stake_mint.key())]
     pub stake_mint: Account<'info, Mint>,
 
     #[account(
@@ -407,7 +410,7 @@ pub struct CheckDevotion<'info> {
         seeds = [b"state"],
         bump
     )]
-    pub state: Account<'info, StakeState>,
+    pub stake_state: Account<'info, StakeState>,
 }
 
 #[derive(Accounts)]
