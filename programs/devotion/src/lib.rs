@@ -7,20 +7,36 @@ declare_id!("FMzU5SZEeAnP9ts9DZ9rJuFyimTfshwjQp4A3Kjm6Kf7");
 pub mod devotion {
     use super::*;
 
-    // initialization of the program state has no safety checks
+    // initialization of the program state checks the safety of max devotion
     pub fn initialize(
         ctx: Context<Initialize>, 
         interval: i64,
         max_devotion_charge: i64,
     ) -> Result<()> {
+        // Validate interval and max_devotion_charge
+        if interval <= 0 {
+            return Err(ErrorCode::InvalidInterval.into());
+        }
+        if max_devotion_charge <= 0 {
+            return Err(ErrorCode::InvalidMaxDevotionCharge.into());
+        }
+
+        // Check if max_devotion calculation could overflow using u128
+        let decimals_multiplier = 10u128.pow(ctx.accounts.stake_mint.decimals as u32);
+        
+        // Check if max_devotion_charge * U64::MAX would overflow when converted to u128
+        (u128::from(u64::MAX))
+            .checked_mul(max_devotion_charge as u128)
+            .ok_or(ErrorCode::MaxDevotionOverflow)?
+            .checked_div(decimals_multiplier)
+            .ok_or(ErrorCode::DivError)?
+            .checked_div(interval as u128)
+            .ok_or(ErrorCode::DivError)?;
+
         let state = &mut ctx.accounts.stake_state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
-        
-        // Store the token's decimals
         state.decimals = ctx.accounts.stake_mint.decimals;
-        
-        // Set the configurable parameters
         state.interval = interval;
         state.max_devotion_charge = max_devotion_charge;
         
@@ -48,20 +64,27 @@ pub mod devotion {
             // Cap the seconds at maximum multiplier using state value
             let capped_seconds = std::cmp::min(seconds_staked, ctx.accounts.state.max_devotion_charge);
             
-            // Calculate devotion using actual token decimals
-            let decimals_multiplier = 10u64.pow(ctx.accounts.state.decimals as u32);
-            let devotion = (capped_seconds as u64)
-                .checked_mul(devoted.amount)
+            // Calculate devotion using u128
+            let decimals_multiplier = 10u128.pow(ctx.accounts.state.decimals as u32);
+            let devotion = (capped_seconds as u128)
+                .checked_mul(devoted.amount as u128)
                 .ok_or(ErrorCode::MathOverflow)?
                 .checked_div(decimals_multiplier)
                 .ok_or(ErrorCode::DivError)?
-                .checked_div(ctx.accounts.state.interval as u64)
+                .checked_div(ctx.accounts.state.interval as u128)
                 .ok_or(ErrorCode::DivError)?;
                 
-            // Add to residual devotion
-            devoted.residual_devotion = devoted.residual_devotion
-                .checked_add(devotion)
-                .ok_or(ErrorCode::MathOverflow)?;
+            // Calculate max_devotion using u128
+            let max_devotion = (devoted.amount as u128)
+                .checked_mul(ctx.accounts.state.max_devotion_charge as u128)
+                .ok_or(ErrorCode::MathOverflow)?
+                .checked_div(decimals_multiplier)
+                .ok_or(ErrorCode::DivError)?
+                .checked_div(ctx.accounts.state.interval as u128)
+                .ok_or(ErrorCode::DivError)?;
+                
+            // Cap residual_devotion at max_devotion
+            devoted.residual_devotion = std::cmp::min(devoted.residual_devotion, max_devotion);
         } else {
             // Initialize user data if this is their first stake
             devoted.user = ctx.accounts.user.key();
@@ -182,7 +205,7 @@ pub mod devotion {
         Ok(())
     }
 
-    pub fn check_devotion(ctx: Context<CheckDevotion>) -> Result<u64> {
+    pub fn check_devotion(ctx: Context<CheckDevotion>) -> Result<u128> {
         let devoted = &ctx.accounts.devoted;
         let state = &ctx.accounts.state;
         let current_time = Clock::get()?.unix_timestamp;
@@ -191,21 +214,31 @@ pub mod devotion {
         // Cap the seconds at maximum multiplier using state value
         let capped_seconds = std::cmp::min(seconds_staked, state.max_devotion_charge);
         
-        // Calculate devotion using actual token decimals
-        let decimals_multiplier = 10u64.pow(state.decimals as u32);
-        let devotion = (capped_seconds as u64)
-            .checked_mul(devoted.amount)
+        // Calculate using u128
+        let decimals_multiplier = 10u128.pow(state.decimals as u32);
+        let max_devotion = (devoted.amount as u128)
+            .checked_mul(state.max_devotion_charge as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(decimals_multiplier)
             .ok_or(ErrorCode::DivError)?
-            .checked_div(state.interval as u64)
+            .checked_div(state.interval as u128)
+            .ok_or(ErrorCode::DivError)?;
+        
+        // Calculate current devotion
+        let devotion = (capped_seconds as u128)
+            .checked_mul(devoted.amount as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(decimals_multiplier)
+            .ok_or(ErrorCode::DivError)?
+            .checked_div(state.interval as u128)
             .ok_or(ErrorCode::DivError)?;
             
         let total_devotion = devotion
             .checked_add(devoted.residual_devotion)
             .ok_or(ErrorCode::MathOverflow)?;
             
-        Ok(total_devotion)
+        // Return the minimum of total_devotion and max_devotion
+        Ok(std::cmp::min(total_devotion, max_devotion))
     }
 }
 
@@ -224,7 +257,7 @@ pub struct StakeState {
 pub struct Devoted {
     pub user: Pubkey,
     pub amount: u64,
-    pub residual_devotion: u64,
+    pub residual_devotion: u128,
     pub last_stake_timestamp: i64,
     pub bump: u8,
 }
@@ -442,4 +475,13 @@ pub enum ErrorCode {
 
     #[msg("Division error")]
     DivError,
+
+    #[msg("Invalid interval value")]
+    InvalidInterval,
+    
+    #[msg("Invalid max devotion charge value")]
+    InvalidMaxDevotionCharge,
+    
+    #[msg("Max devotion calculation would overflow")]
+    MaxDevotionOverflow,
 }
