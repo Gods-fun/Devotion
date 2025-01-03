@@ -44,11 +44,12 @@ The Devotion program is designed as a flexible framework for tokenized agent dev
 ## Mechanics
 
 ### Initialization
-The program must be initialized with two key parameters:
+The program must be initialized with three key parameters:
 - `interval`: The time period (in seconds) used to calculate devotion rates
 - `max_devotion_charge`: The maximum time multiplier for devotion accumulation
+- `token_mint`: The SPL staking token's mint address
 
-These parameters determine how quickly users can accumulate devotion and the maximum devotion possible for a given stake amount.
+These parameters determine how users can stake tokens, accumulate devotion and the maximum devotion possible for a given stake amount.
 
 ### Core Functions
 
