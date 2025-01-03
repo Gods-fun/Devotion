@@ -5,13 +5,21 @@ import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, createMint, getAssociatedTokenAddress, createAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import { assert } from "chai";
 
-const TOKEN_DECIMALS = 1_000_000_000; // 10^9
-
+// Add this at the top of your test file
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Test with different decimal configurations
+const TEST_DECIMALS = 6; // Let's test with 6 decimals (like USDC)
+const TOKEN_DECIMALS = 10 ** TEST_DECIMALS;
 
 const SECONDS_PER_DAY = 86_400;
 const DEFAULT_INTERVAL = SECONDS_PER_DAY; // 1 day in seconds
 const DEFAULT_MAX_DEVOTION_CHARGE = SECONDS_PER_DAY * 180; // 180 days in seconds
+
+function formatAmount(amount: number | anchor.BN, decimals: number = TEST_DECIMALS): string {
+  const bn = amount instanceof anchor.BN ? amount : new anchor.BN(amount);
+  return `${bn.toString()} raw (${bn.div(new anchor.BN(10 ** decimals)).toString()} tokens)`;
+}
 
 describe("devotion", () => {
   const provider = anchor.AnchorProvider.env();
@@ -54,9 +62,10 @@ describe("devotion", () => {
       admin,
       admin.publicKey,
       null,
-      9 // decimals
+      TEST_DECIMALS
     );
     console.log("Stake mint created:", stakeMint.toString());
+    console.log("Stake mint decimals:", TEST_DECIMALS);
     
     // Derive PDAs
     console.log("\nDeriving Program PDAs...");
@@ -320,11 +329,10 @@ describe("devotion", () => {
     const initialDevoted = await program.account.devoted.fetch(devotedAddress);
     
     console.log("\n=== Initial State ===");
-    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
-    console.log("Initial user token balance:", initialUserBalance.value.uiAmount, "tokens");
-    console.log("Initial devoted amount:", initialDevoted.amount.toString(), "tokens");
-    console.log("Initial devoted amount (formatted):", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
-    console.log("Initial residual devotion:", initialDevoted.residualDevotion.toString());
+    console.log("Initial vault balance:", formatAmount(initialVaultBalance.value.amount));
+    console.log("Initial user token balance:", formatAmount(initialUserBalance.value.amount));
+    console.log("Initial devoted amount:", formatAmount(initialDevoted.amount));
+    console.log("Initial residual devotion:", formatAmount(initialDevoted.residualDevotion));
 
     // Get initial slot and timestamp
     let slot = await provider.connection.getSlot();
@@ -341,7 +349,7 @@ describe("devotion", () => {
     console.log("Time difference:", (newTimestamp - initialTimestamp), "seconds");
 
     const additionalAmount = new anchor.BN(400_000).mul(new anchor.BN(TOKEN_DECIMALS));
-    console.log("\nAdditional amount to devote:", additionalAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("\nAdditional amount to devote:", formatAmount(additionalAmount));
 
     // Get initial devotion
     const initialDevotion = await program.methods
@@ -352,7 +360,7 @@ describe("devotion", () => {
       })
       .view();
 
-    console.log("Initial devotion score:", initialDevotion.toString());
+    console.log("Initial devotion score:", formatAmount(initialDevotion));
 
     const devoteTx = await program.methods
       .devote(additionalAmount)
@@ -379,11 +387,11 @@ describe("devotion", () => {
     const finalUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
 
     console.log("\n=== Final State ===");
-    console.log("Final vault balance:", finalVaultBalance.value.uiAmount, "tokens");
-    console.log("Final user token balance:", finalUserBalance.value.uiAmount, "tokens");
-    console.log("Final devoted amount:", finalDevotedAccount.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
-    console.log("Final residual devotion:", finalDevotedAccount.residualDevotion.toString());
-    console.log("Total devoted in program:", finalTotalDevotedAccount.totalTokens.toString(), "tokens");
+    console.log("Final vault balance:", formatAmount(finalVaultBalance.value.amount));
+    console.log("Final user token balance:", formatAmount(finalUserBalance.value.amount));
+    console.log("Final devoted amount:", formatAmount(finalDevotedAccount.amount));
+    console.log("Final residual devotion:", formatAmount(finalDevotedAccount.residualDevotion));
+    console.log("Total devoted in program:", formatAmount(finalTotalDevotedAccount.totalTokens));
 
     // Verify the total amount is now the sum of both deposits
     const expectedTotal = initialDevoted.amount.add(additionalAmount);
@@ -399,14 +407,14 @@ describe("devotion", () => {
     const initialTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
     
     console.log("\n=== Initial State ===");
-    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
-    console.log("Initial user token balance:", initialUserBalance.value.uiAmount, "tokens");
-    console.log("Initial devoted amount:", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
-    console.log("Initial total devoted:", initialTotalDevoted.totalTokens.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Initial vault balance:", formatAmount(initialVaultBalance.value.amount));
+    console.log("Initial user token balance:", formatAmount(initialUserBalance.value.amount));
+    console.log("Initial devoted amount:", formatAmount(initialDevoted.amount));
+    console.log("Initial total devoted:", formatAmount(initialTotalDevoted.totalTokens));
 
     // Amount to withdraw (let's withdraw half of the devoted tokens)
     const withdrawAmount = initialDevoted.amount.div(new anchor.BN(2));
-    console.log("\nWithdrawing amount:", withdrawAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("\nWithdrawing amount:", formatAmount(withdrawAmount));
 
     const waverTx = await program.methods
       .waver(withdrawAmount)
@@ -433,10 +441,10 @@ describe("devotion", () => {
     const finalTotalDevoted = await program.account.totalDevoted.fetch(totalDevotedAddress);
 
     console.log("\n=== Final State ===");
-    console.log("Final vault balance:", finalVaultBalance.value.uiAmount, "tokens");
-    console.log("Final user token balance:", finalUserBalance.value.uiAmount, "tokens");
-    console.log("Final devoted amount:", finalDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
-    console.log("Final total devoted:", finalTotalDevoted.totalTokens.div(new anchor.BN(TOKEN_DECIMALS)).toString(), "tokens");
+    console.log("Final vault balance:", formatAmount(finalVaultBalance.value.amount));
+    console.log("Final user token balance:", formatAmount(finalUserBalance.value.amount));
+    console.log("Final devoted amount:", formatAmount(finalDevoted.amount));
+    console.log("Final total devoted:", formatAmount(finalTotalDevoted.totalTokens));
 
     // Verify the accounts were updated correctly
     assert.ok(
@@ -483,10 +491,10 @@ describe("devotion", () => {
     const initialVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
 
     console.log("\n=== Initial State ===");
-    console.log("Initial user SOL balance:", initialUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
-    console.log("Initial user token balance:", initialUserTokens.value.uiAmount, "tokens");
-    console.log("Initial vault balance:", initialVaultBalance.value.uiAmount, "tokens");
-    console.log("Initial devoted amount:", initialDevoted.amount.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+    console.log("Initial user SOL balance:", formatAmount(initialUserSol));
+    console.log("Initial user token balance:", formatAmount(initialUserTokens.value.amount));
+    console.log("Initial vault balance:", formatAmount(initialVaultBalance.value.amount));
+    console.log("Initial devoted amount:", formatAmount(initialDevoted.amount));
 
     const heresyTx = await program.methods
       .heresy()
@@ -510,15 +518,15 @@ describe("devotion", () => {
     const finalUserTokens = await provider.connection.getTokenAccountBalance(userTokenAccount);
 
     console.log("\n=== Final State ===");
-    console.log("Final user SOL balance:", finalUserSol / anchor.web3.LAMPORTS_PER_SOL, "SOL");
-    console.log("Final user token balance:", finalUserTokens.value.uiAmount, "tokens");
+    console.log("Final user SOL balance:", formatAmount(finalUserSol));
+    console.log("Final user token balance:", formatAmount(finalUserTokens.value.amount));
     
     // Verify SOL balance increased (account rent was returned from devoted account)
     assert.isTrue(
         finalUserSol > initialUserSol,
         "User should have received rent SOL back from closed devoted account"
     );
-    console.log("SOL returned to user:", (finalUserSol - initialUserSol) / anchor.web3.LAMPORTS_PER_SOL, "SOL");
+    console.log("SOL returned to user:", formatAmount(finalUserSol - initialUserSol));
 
     // Verify token balance increased by the vault's tokens
     const tokenIncrease = new anchor.BN(finalUserTokens.value.amount)
@@ -527,7 +535,7 @@ describe("devotion", () => {
         tokenIncrease.eq(initialDevoted.amount),
         "User token balance should have increased by the vault amount"
     );
-    console.log("Tokens returned to user:", tokenIncrease.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+    console.log("Tokens returned to user:", formatAmount(tokenIncrease));
 
     // Verify devoted account is closed
     const devotedAccount = await provider.connection.getAccountInfo(devotedAddress);
@@ -694,5 +702,225 @@ describe("devotion", () => {
         "Expected Anchor error due to invalid devoted account"
       );
     }
+  });
+
+  // Add a new test to verify decimal handling
+  it("Correctly handles token decimals", async () => {
+    // Fetch the stake state to verify decimals were stored correctly
+    const stakeState = await program.account.stakeState.fetch(stakeStateAddress);
+    assert.equal(
+      stakeState.decimals,
+      TEST_DECIMALS,
+      "Stake state should store correct decimals"
+    );
+
+    // Test with small amount (1 token)
+    const smallAmount = new anchor.BN(TOKEN_DECIMALS); // 1 full token
+    await program.methods
+      .devote(smallAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        stakeState: stakeStateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    // Verify vault balance
+    const vaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    assert.equal(
+      vaultBalance.value.decimals,
+      TEST_DECIMALS,
+      "Token account should have correct decimals"
+    );
+    assert.equal(
+      vaultBalance.value.amount,
+      smallAmount.toString(),
+      "Vault should have correct raw amount"
+    );
+    assert.equal(
+      vaultBalance.value.uiAmount,
+      1,
+      "Vault should have 1 token in UI amount"
+    );
+
+    // Test devotion calculation with different decimals
+    const devotion = await program.methods
+      .checkDevotion()
+      .accounts({
+        devoted: devotedAddress,
+        stakeState: stakeStateAddress,
+      })
+      .view();
+
+    console.log("\nDevotion test with decimals:");
+    console.log("Raw amount staked:", smallAmount.toString());
+    console.log("UI amount staked:", smallAmount.div(new anchor.BN(TOKEN_DECIMALS)).toString());
+    console.log("Raw devotion score:", devotion.toString());
+    console.log("UI devotion score:", new anchor.BN(devotion.toString())
+      .div(new anchor.BN(TOKEN_DECIMALS)).toString());
+
+    // Test with fractional amount (0.5 tokens)
+    const fractionalAmount = new anchor.BN(TOKEN_DECIMALS).div(new anchor.BN(2));
+    await program.methods
+      .devote(fractionalAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        stakeState: stakeStateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    // Verify fractional amounts are handled correctly
+    const finalVaultBalance = await provider.connection.getTokenAccountBalance(userVaultAddress);
+    const expectedTotal = smallAmount.add(fractionalAmount);
+    assert.equal(
+      finalVaultBalance.value.amount,
+      expectedTotal.toString(),
+      "Vault should handle fractional amounts correctly"
+    );
+    assert.equal(
+      finalVaultBalance.value.uiAmount,
+      1.5,
+      "Vault should show correct UI amount with fractions"
+    );
+  });
+
+  it("Correctly calculates devotion with different decimal configurations", async () => {
+    // First devote a specific amount and wait to accumulate some devotion
+    const devoteAmount = new anchor.BN(100).mul(new anchor.BN(TOKEN_DECIMALS)); // 100 tokens
+    await program.methods
+      .devote(devoteAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        stakeState: stakeStateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    // Get initial state
+    const initialDevoted = await program.account.devoted.fetch(devotedAddress);
+    console.log("\n=== Initial Devotion State ===");
+    console.log("Amount staked:", formatAmount(initialDevoted.amount));
+    console.log("Initial residual devotion:", formatAmount(initialDevoted.residualDevotion));
+    console.log("Initial timestamp:", new Date(initialDevoted.lastStakeTimestamp.toNumber() * 1000).toISOString());
+
+    // Wait for some time to accumulate devotion
+    await sleep(2000);
+
+    // Check devotion after waiting
+    const devotionAfterWait = await program.methods
+      .checkDevotion()
+      .accounts({
+        devoted: devotedAddress,
+        stakeState: stakeStateAddress,
+      })
+      .view();
+
+    console.log("\n=== Devotion After Wait ===");
+    console.log("Raw devotion score:", devotionAfterWait.toString());
+    console.log("UI devotion score:", formatAmount(devotionAfterWait));
+
+    // Now devote a small amount to update residual_devotion
+    const smallAmount = new anchor.BN(1).mul(new anchor.BN(TOKEN_DECIMALS)); // 1 token
+    await program.methods
+      .devote(smallAmount)
+      .accounts({
+        user: userKeypair.publicKey,
+        stakeState: stakeStateAddress,
+        userVault: userVaultAddress,
+        userTokenAccount: userTokenAccount,
+        stakeMint: stakeMint,
+        devoted: devotedAddress,
+        totalDevoted: totalDevotedAddress,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([userKeypair])
+      .rpc();
+
+    // Check state after small devote
+    const afterSmallDevote = await program.account.devoted.fetch(devotedAddress);
+    console.log("\n=== After Small Devote ===");
+    console.log("New total amount:", formatAmount(afterSmallDevote.amount));
+    console.log("New residual devotion:", formatAmount(afterSmallDevote.residualDevotion));
+    console.log("New timestamp:", new Date(afterSmallDevote.lastStakeTimestamp.toNumber() * 1000).toISOString());
+
+    // Verify residual devotion was stored correctly
+    assert.ok(
+      afterSmallDevote.residualDevotion.eq(devotionAfterWait),
+      "Residual devotion should match previous devotion score"
+    );
+
+    // Wait again to accumulate more devotion
+    await sleep(2000);
+
+    // Check final devotion
+    const finalDevotion = await program.methods
+      .checkDevotion()
+      .accounts({
+        devoted: devotedAddress,
+        stakeState: stakeStateAddress,
+      })
+      .view();
+
+    console.log("\n=== Final Devotion Check ===");
+    console.log("Raw final devotion:", finalDevotion.toString());
+    console.log("UI final devotion:", formatAmount(finalDevotion));
+
+    // Calculate expected devotion range
+    const stakeState = await program.account.stakeState.fetch(stakeStateAddress);
+    const totalAmount = afterSmallDevote.amount;
+    const timeElapsed = 2; // approximately 2 seconds
+    
+    // Calculate minimum expected devotion (not including residual)
+    const minExpectedDevotion = totalAmount
+      .mul(new anchor.BN(timeElapsed))
+      .div(new anchor.BN(10 ** stakeState.decimals))
+      .div(new anchor.BN(stakeState.interval));
+
+    // Add residual to get total minimum expected
+    const minTotalExpectedDevotion = minExpectedDevotion.add(afterSmallDevote.residualDevotion);
+
+    console.log("\n=== Devotion Calculations ===");
+    console.log("Minimum expected devotion:", formatAmount(minTotalExpectedDevotion));
+    console.log("Actual devotion:", formatAmount(finalDevotion));
+
+    // Verify the devotion is at least what we expect
+    assert.ok(
+      new anchor.BN(finalDevotion.toString()).gte(minTotalExpectedDevotion),
+      "Final devotion should be at least the minimum expected amount"
+    );
+
+    // Verify it doesn't exceed max devotion
+    const maxDevotionCharge = new anchor.BN(stakeState.maxDevotionCharge);
+    const maxDevotion = totalAmount
+      .mul(maxDevotionCharge)
+      .div(new anchor.BN(stakeState.interval));
+
+    assert.ok(
+      new anchor.BN(finalDevotion.toString()).lte(maxDevotion),
+      "Final devotion should not exceed max devotion"
+    );
   });
 });
