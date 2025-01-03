@@ -7,6 +7,7 @@ declare_id!("FMzU5SZEeAnP9ts9DZ9rJuFyimTfshwjQp4A3Kjm6Kf7");
 pub mod devotion {
     use super::*;
 
+    // initialization of the program state has no safety checks
     pub fn initialize(
         ctx: Context<Initialize>, 
         interval: i64,
@@ -15,7 +16,6 @@ pub mod devotion {
         let state = &mut ctx.accounts.stake_state;
         state.admin = ctx.accounts.admin.key();
         state.stake_mint = ctx.accounts.stake_mint.key();
-        state.bump = ctx.bumps.stake_state;
         
         // Store the token's decimals
         state.decimals = ctx.accounts.stake_mint.decimals;
@@ -27,12 +27,17 @@ pub mod devotion {
         // Initialize total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
         total_devoted.total_tokens = 0;
-        total_devoted.bump = ctx.bumps.total_devoted;
         
         Ok(())
     }
 
     pub fn devote(ctx: Context<Devote>, amount: u64) -> Result<()> {
+
+        if amount == 0 {
+            // custom error
+            return Err(ErrorCode::AmountZero.into());
+        }
+
         let devoted = &mut ctx.accounts.devoted;
         
         // Calculate current devotion before adding new tokens
@@ -85,6 +90,12 @@ pub mod devotion {
     }
 
     pub fn waver(ctx: Context<Waver>, amount: u64) -> Result<()> {
+
+        if amount == 0 {
+            // custom error
+            return Err(ErrorCode::AmountZero.into());
+        }
+
         // Transfer from user's vault to user
         let devoted_binding = &ctx.accounts.devoted;
         let seeds = &[
@@ -122,6 +133,16 @@ pub mod devotion {
     }
 
     pub fn heresy(ctx: Context<Heresy>) -> Result<()> {
+        if ctx.accounts.user_vault.amount == 0 {
+            // custom error
+            return Err(ErrorCode::VaultZero.into());
+        }
+
+        if ctx.accounts.devoted.amount == 0 {
+            // custom error
+            return Err(ErrorCode::DevotionZero.into());
+        }
+
         // If there are tokens in the vault, transfer them back to user
         if ctx.accounts.user_vault.amount > 0 {
             // Transfer all tokens from vault to user
@@ -185,7 +206,6 @@ pub mod devotion {
 pub struct StakeState {
     pub admin: Pubkey,
     pub stake_mint: Pubkey,
-    pub bump: u8,
     pub interval: i64,
     pub max_devotion_charge: i64,
     pub decimals: u8,
@@ -205,14 +225,6 @@ pub struct Devoted {
 #[derive(InitSpace)]
 pub struct TotalDevoted {
     pub total_tokens: u64,
-    pub bump: u8,
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct UserVault {
-    pub user: Pubkey,
-    pub bump: u8,
 }
 
 #[derive(Accounts)]
@@ -397,4 +409,17 @@ pub struct Heresy<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+}
+
+// error codes
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Amount cannot be zero")]
+    AmountZero,
+
+    #[msg("Vault cannot be zero")]
+    VaultZero,
+
+    #[msg("Devotion cannot be zero")]
+    DevotionZero,
 }
