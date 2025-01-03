@@ -1,3 +1,6 @@
+
+![lina_devotion5](https://github.com/user-attachments/assets/dcc40465-91c8-4ec6-9bed-b66a89a01dfa)
+
 # Devotion Program Documentation
 
 ---
@@ -6,7 +9,7 @@
 
 **Warning: This is experimental open source software that has not been audited. Use it at your own risk. Interacting with this software could result in the loss of funds.**
 
-*Built with ❤️ for agent developers everywhere by https://gods.fun and https://*
+*Built with ❤️ for agent developers everywhere by Gods https://gods.fun and ai16z partners https://elizaos.ai/
 
 ---
 
@@ -21,6 +24,8 @@ The Devotion program is designed as a flexible framework for tokenized agent dev
 - **Onchain Integration**: Utilize the `check_devotion` instruction handler for onchain mechanics and games
 - **Community Metrics**: Enable agent developers to measure community stickiness and long-term dedication
 - **Offchain Applications**: Connect wallet activity to social profiles to enhance agent-user interactions
+
+![lina_devotion2](https://github.com/user-attachments/assets/c6d99f56-cd48-4bdf-a380-bd6993950bf4)
 
 ### Use Cases
 
@@ -70,6 +75,8 @@ The `heresy` function allows users to completely exit the program:
 - User's devotion account is closed
 - All accumulated devotion is permanently lost
 - Account rent is refunded to the user
+
+![lina_devotion3](https://github.com/user-attachments/assets/f24c2b36-7617-48e1-a3a1-1c2e73c3a4ef)
 
 ## Prerequisites
 
@@ -209,3 +216,7 @@ For more detailed information, refer to the [Anchor documentation](https://proje
 ---
 
 This documentation provides a step-by-step guide for setting up your development environment, configuring your project, and running tests. Adjust the paths and versions as necessary for your specific setup.
+
+![lina_devotion4](https://github.com/user-attachments/assets/00737c4a-8377-4990-a202-78724a24a992)
+
+
