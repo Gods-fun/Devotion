@@ -52,16 +52,16 @@ pub mod devotion {
             let decimals_multiplier = 10u64.pow(ctx.accounts.state.decimals as u32);
             let devotion = (capped_seconds as u64)
                 .checked_mul(devoted.amount)
-                .unwrap_or(0)
+                .ok_or(ErrorCode::MathOverflow)?
                 .checked_div(decimals_multiplier)
-                .unwrap_or(0)
+                .ok_or(ErrorCode::DivError)?
                 .checked_div(ctx.accounts.state.interval as u64)
-                .unwrap_or(0);
+                .ok_or(ErrorCode::DivError)?;
                 
             // Add to residual devotion
             devoted.residual_devotion = devoted.residual_devotion
                 .checked_add(devotion)
-                .unwrap_or(devoted.residual_devotion);
+                .ok_or(ErrorCode::MathOverflow)?;
         } else {
             // Initialize user data if this is their first stake
             devoted.user = ctx.accounts.user.key();
@@ -79,12 +79,16 @@ pub mod devotion {
         transfer(cpi_ctx, amount)?;
 
         // Update user's stake info
-        devoted.amount = devoted.amount.checked_add(amount).unwrap();
+        devoted.amount = devoted.amount
+            .checked_add(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
 
         // Update total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
-        total_devoted.total_tokens = total_devoted.total_tokens.checked_add(amount).unwrap();
+        total_devoted.total_tokens = total_devoted.total_tokens
+            .checked_add(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
 
         Ok(())
     }
@@ -117,7 +121,9 @@ pub mod devotion {
 
         // Update user's stake info
         let devoted = &mut ctx.accounts.devoted;
-        devoted.amount = devoted.amount.checked_sub(amount).unwrap();
+        devoted.amount = devoted.amount
+            .checked_sub(amount)
+            .ok_or(ErrorCode::InsufficientFunds)?;
         
         // Reset timestamp to current time
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
@@ -127,7 +133,9 @@ pub mod devotion {
 
         // Update total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
-        total_devoted.total_tokens = total_devoted.total_tokens.checked_sub(amount).unwrap();
+        total_devoted.total_tokens = total_devoted.total_tokens
+            .checked_sub(amount)
+            .ok_or(ErrorCode::MathUnderflow)?;
 
         Ok(())
     }
@@ -168,7 +176,7 @@ pub mod devotion {
             let total_devoted = &mut ctx.accounts.total_devoted;
             total_devoted.total_tokens = total_devoted.total_tokens
                 .checked_sub(ctx.accounts.user_vault.amount)
-                .unwrap();
+                .ok_or(ErrorCode::MathUnderflow)?;
         }
 
         Ok(())
@@ -187,15 +195,15 @@ pub mod devotion {
         let decimals_multiplier = 10u64.pow(state.decimals as u32);
         let devotion = (capped_seconds as u64)
             .checked_mul(devoted.amount)
-            .unwrap_or(0)
+            .ok_or(ErrorCode::MathOverflow)?
             .checked_div(decimals_multiplier)
-            .unwrap_or(0)
+            .ok_or(ErrorCode::DivError)?
             .checked_div(state.interval as u64)
-            .unwrap_or(0);
+            .ok_or(ErrorCode::DivError)?;
             
         let total_devotion = devotion
             .checked_add(devoted.residual_devotion)
-            .unwrap_or(devoted.residual_devotion);
+            .ok_or(ErrorCode::MathOverflow)?;
             
         Ok(total_devotion)
     }
@@ -422,4 +430,16 @@ pub enum ErrorCode {
 
     #[msg("Devotion cannot be zero")]
     DevotionZero,
+
+    #[msg("Math operation overflow")]
+    MathOverflow,
+
+    #[msg("Math operation underflow")]
+    MathUnderflow,
+
+    #[msg("Insufficient funds for operation")]
+    InsufficientFunds,
+
+    #[msg("Division error")]
+    DivError,
 }
