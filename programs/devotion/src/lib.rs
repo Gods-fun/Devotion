@@ -11,7 +11,6 @@ pub mod devotion {
         ctx: Context<Initialize>, 
         interval: i64,
         max_devotion_charge: i64,
-        reset_devotion: bool
     ) -> Result<()> {
         let state = &mut ctx.accounts.stake_state;
         state.admin = ctx.accounts.admin.key();
@@ -24,7 +23,6 @@ pub mod devotion {
         // Set the configurable parameters
         state.interval = interval;
         state.max_devotion_charge = max_devotion_charge;
-        state.reset_devotion = reset_devotion;
         
         // Initialize total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
@@ -113,10 +111,8 @@ pub mod devotion {
         // Reset timestamp to current time
         devoted.last_stake_timestamp = Clock::get()?.unix_timestamp;
         
-        // Only reset residual_devotion if reset_devotion is true
-        if ctx.accounts.state.reset_devotion {
-            devoted.residual_devotion = 0;
-        }
+        // Always reset residual_devotion to 0
+        devoted.residual_devotion = 0;
 
         // Update total devoted
         let total_devoted = &mut ctx.accounts.total_devoted;
@@ -192,7 +188,6 @@ pub struct StakeState {
     pub bump: u8,
     pub interval: i64,
     pub max_devotion_charge: i64,
-    pub reset_devotion: bool,
     pub decimals: u8,
 }
 

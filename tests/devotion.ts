@@ -12,7 +12,6 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const SECONDS_PER_DAY = 86_400;
 const DEFAULT_INTERVAL = SECONDS_PER_DAY; // 1 day in seconds
 const DEFAULT_MAX_DEVOTION_CHARGE = SECONDS_PER_DAY * 180; // 180 days in seconds
-const DEFAULT_RESET_DEVOTION = true;
 
 describe("devotion", () => {
   const provider = anchor.AnchorProvider.env();
@@ -124,8 +123,7 @@ describe("devotion", () => {
       const tx = await program.methods
         .initialize(
           new anchor.BN(DEFAULT_INTERVAL),
-          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE),
-          DEFAULT_RESET_DEVOTION
+          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE)
         )
         .accounts({
           admin: admin.publicKey,
@@ -151,7 +149,6 @@ describe("devotion", () => {
       console.log("- Stake Mint:", stateAccount.stakeMint.toString());
       console.log("- Interval:", stateAccount.interval.toString(), "seconds");
       console.log("- Max Devotion Charge:", stateAccount.maxDevotionCharge.toString(), "seconds");
-      console.log("- Reset Devotion:", stateAccount.resetDevotion);
       console.log("- Bump:", stateAccount.bump);
 
       console.log("\nTotal Devoted Account Data:");
@@ -163,7 +160,6 @@ describe("devotion", () => {
       assert.ok(stateAccount.stakeMint.equals(stakeMint), "Stake mint mismatch");
       assert.ok(stateAccount.interval.eq(new anchor.BN(DEFAULT_INTERVAL)), "Interval mismatch");
       assert.ok(stateAccount.maxDevotionCharge.eq(new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE)), "Max devotion charge mismatch");
-      assert.equal(stateAccount.resetDevotion, DEFAULT_RESET_DEVOTION, "Reset devotion mismatch");
       assert.equal(totalDevotedAccount.totalTokens.toString(), "0", "Total tokens should be 0");
       
       console.log("Your transaction signature", tx);
@@ -180,8 +176,7 @@ describe("devotion", () => {
       await program.methods
         .initialize(
           new anchor.BN(DEFAULT_INTERVAL),
-          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE),
-          DEFAULT_RESET_DEVOTION
+          new anchor.BN(DEFAULT_MAX_DEVOTION_CHARGE)
         )
         .accounts({
           admin: admin.publicKey,
