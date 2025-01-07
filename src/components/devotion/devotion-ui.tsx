@@ -1,11 +1,12 @@
 'use client'
 
 import { PublicKey } from '@solana/web3.js'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ellipsify } from '../ui/ui-layout'
 import { ExplorerLink } from '../cluster/cluster-ui'
 import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-access'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { BN } from '@coral-xyz/anchor'
 
 export function DevotionCreate() {
   const { initialize, stateAccount } = useDevotionProgram()
@@ -38,6 +39,18 @@ export function DevotionCreate() {
     return <p>Connect your wallet</p>
   }
 
+  const handleSubmit = async () => {
+    try {
+      await initialize.mutateAsync({
+        interval: parseInt(interval),
+        maxDevotionCharge: parseInt(maxDevotionCharge),
+        mint,
+      })
+    } catch (error) {
+      console.error('Failed to initialize:', error)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 items-center">
       <input
@@ -63,7 +76,7 @@ export function DevotionCreate() {
       />
       <button
         className="btn btn-xs lg:btn-md btn-primary"
-        onClick={() => handleSubmit()}
+        onClick={handleSubmit}
         disabled={initialize.isPending || !isFormValid}
       >
         Create {initialize.isPending && '...'}
@@ -109,7 +122,6 @@ export function DevotionList() {
 
   return (
     <div className="space-y-6">
-      <TotalDevotedCard />
       {publicKey ? (
         userDevotedAccount ? (
           // User has a devoted account - show their stats and actions
@@ -176,23 +188,59 @@ function NewDevotionCard() {
   )
 }
 
-function TotalDevotedCard() {
-  const { totalDevotedAccount } = useDevotionProgram()
+function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any }) {
+  const [currentDevotion, setCurrentDevotion] = useState<string>('0.00')
 
-  if (totalDevotedAccount.isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    )
-  }
+  useEffect(() => {
+    const calculateDevotion = () => {
+      if (!devoted || !stakeState) return '0.00'
+
+      const currentTime = Math.floor(Date.now() / 1000)
+      const secondsStaked = Math.max(0, currentTime - devoted.lastStakeTimestamp.toNumber())
+      
+      // Cap the seconds at maximum multiplier
+      const cappedSeconds = Math.min(secondsStaked, stakeState.maxDevotionCharge.toNumber())
+      
+      // Calculate using the same logic as the Rust program
+      const decimalsMultiplier = new BN(10).pow(new BN(stakeState.decimals))
+      
+      // Calculate current devotion
+      const devotion = new BN(cappedSeconds)
+        .mul(new BN(devoted.amount))
+        .div(decimalsMultiplier)
+        .div(new BN(stakeState.interval))
+      
+      // Calculate max devotion
+      const maxDevotion = new BN(devoted.amount)
+        .mul(new BN(stakeState.maxDevotionCharge))
+        .div(decimalsMultiplier)
+        .div(new BN(stakeState.interval))
+      
+      // Add residual devotion
+      const totalDevotion = devotion.add(new BN(devoted.residualDevotion))
+      
+      // Get the minimum of total devotion and max devotion
+      const finalDevotion = BN.min(totalDevotion, maxDevotion)
+      
+      // Convert to display format with 2 decimal places
+      return (finalDevotion.toNumber() / 100).toFixed(2)
+    }
+
+    // Update every second
+    const interval = setInterval(() => {
+      setCurrentDevotion(calculateDevotion())
+    }, 1000)
+
+    // Initial calculation
+    setCurrentDevotion(calculateDevotion())
+
+    return () => clearInterval(interval)
+  }, [devoted, stakeState])
 
   return (
-    <div className="card card-bordered border-base-300 border-4 text-neutral-content">
-      <div className="card-body items-center text-center">
-        <h2 className="card-title">Total Tokens Devoted</h2>
-        <p className="text-3xl">{totalDevotedAccount.data?.totalTokens.toString() ?? '0'}</p>
-      </div>
+    <div className="stat">
+      <div className="stat-title">Current Devotion</div>
+      <div className="stat-value text-4xl">{currentDevotion}</div>
     </div>
   )
 }
@@ -217,7 +265,15 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
   const decimals = stateAccount.data?.decimals ?? 0
   const displayAmount = (amount: number) => {
-    return (amount / Math.pow(10, decimals)).toFixed(decimals)
+    return (amount / Math.pow(10, decimals)).toFixed(2)
+  }
+
+  const handleHeresy = async () => {
+    try {
+      await heresyMutation.mutateAsync()
+    } catch (error) {
+      console.error('Heresy error:', error)
+    }
   }
 
   return (
@@ -226,6 +282,10 @@ function DevotionCard({ account }: { account: PublicKey }) {
         <h2 className="card-title">Your Devotion</h2>
         
         <div className="stats stats-vertical shadow">
+          <DevotionScore 
+            devoted={devotionQuery.data} 
+            stakeState={stateAccount.data} 
+          />
           <div className="stat">
             <div className="stat-title">Devoted Amount</div>
             <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
@@ -278,10 +338,10 @@ function DevotionCard({ account }: { account: PublicKey }) {
           {/* Heresy (close account) */}
           <button
             className="btn btn-error"
-            onClick={() => heresyMutation.mutateAsync()}
+            onClick={handleHeresy}
             disabled={heresyMutation.isPending}
           >
-            Commit Heresy
+            {heresyMutation.isPending ? 'Processing...' : 'Commit Heresy'}
           </button>
         </div>
 
