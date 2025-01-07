@@ -434,6 +434,7 @@ pub struct Heresy<'info> {
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
+    // maybe we need a stake mint constraint here like the other functions?
     pub stake_mint: Account<'info, Mint>,
 
     #[account(
