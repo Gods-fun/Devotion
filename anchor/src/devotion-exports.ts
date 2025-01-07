@@ -21,7 +21,7 @@ export function getDevotionProgramId(cluster: Cluster) {
     case 'devnet':
     case 'testnet':
       // This is the program ID for the Devotion program on devnet and testnet.
-      return new PublicKey('coUnmi3oBUtwtd9fjeAvSsJssXh5A5xyPbhpewyzRVF')
+      return new PublicKey('GodsAfuZbVYY79KADVMe39ZwybWuL5U6RFLvyzUD5qgw')
     case 'mainnet-beta':
     default:
       return DEVOTION_PROGRAM_ID

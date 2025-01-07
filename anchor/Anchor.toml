@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-devotion = "coUnmi3oBUtwtd9fjeAvSsJssXh5A5xyPbhpewyzRVF"
+devotion = "GodsAfuZbVYY79KADVMe39ZwybWuL5U6RFLvyzUD5qgw"
 
 [registry]
 url = "https://api.apr.dev"
