@@ -25,6 +25,8 @@ interface WaverArgs {
   amount: number
 }
 
+const STAKE_MINT = new PublicKey('GZnHRJqhDAymatpB7TjgyEy7AW59rW9rgpbkxa4tysgS')
+
 export function useDevotionProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -60,10 +62,10 @@ export function useDevotionProgram() {
 
   const initialize = useMutation<string, Error, InitializeArgs>({
     mutationKey: ['devotion', 'initialize', { cluster }],
-    mutationFn: ({ interval, maxDevotionCharge, mint }: InitializeArgs) =>
+    mutationFn: ({ interval, maxDevotionCharge }: InitializeArgs) =>
       program.methods
         .initialize(new BN(interval), new BN(maxDevotionCharge))
-        .accounts({ stakeMint: new PublicKey(mint) })
+        .accounts({ stakeMint: STAKE_MINT })
         .rpc(),
     onSuccess: (signature) => {
       transactionToast(signature)
@@ -72,6 +74,14 @@ export function useDevotionProgram() {
     onError: () => toast.error('Failed to initialize account'),
   })
 
+  const devotedAccounts = useQuery({
+    queryKey: ['devotion', 'accounts', { cluster }],
+    queryFn: async () => {
+      const accounts = await program.account.devoted.all();
+      return accounts;
+    },
+  });
+
   return {
     program,
     programId,
@@ -79,15 +89,16 @@ export function useDevotionProgram() {
     initialize,
     stateAccount,
     totalDevotedAccount,
+    devotedAccounts,
   }
 }
 
 export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster()
   const transactionToast = useTransactionToast()
-  const { program, stateAccount, totalDevotedAccount } = useDevotionProgram()
+  const { program, stateAccount } = useDevotionProgram()
 
-  const accountQuery = useQuery({
+  const devotionQuery = useQuery({
     queryKey: ['devotion', 'fetch', { cluster, account }],
     queryFn: () => program.account.devoted.fetch(account),
   })
@@ -95,15 +106,14 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const devoteMutation = useMutation<string, Error, DevoteArgs>({
     mutationKey: ['devotion', 'devote', { cluster, account }],
     mutationFn: ({ amount }: DevoteArgs) => {
-      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
       return program.methods
         .devote(new BN(amount))
-        .accounts({ stakeMint: stateAccount.data.stakeMint })
+        .accounts({ stakeMint: STAKE_MINT })
         .rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
-      return accountQuery.refetch()
+      return devotionQuery.refetch()
     },
     onError: () => toast.error('Failed to devote'),
   })
@@ -111,32 +121,30 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const waverMutation = useMutation<string, Error, WaverArgs>({
     mutationKey: ['devotion', 'waver', { cluster, account }],
     mutationFn: ({ amount }: WaverArgs) => {
-      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
       return program.methods
         .waver(new BN(amount))
-        .accounts({ stakeMint: stateAccount.data.stakeMint })
+        .accounts({ stakeMint: STAKE_MINT })
         .rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
-      return accountQuery.refetch()
+      return devotionQuery.refetch()
     },
   })
 
   const heresyMutation = useMutation<string, Error>({
     mutationKey: ['devotion', 'heresy', { cluster, account }],
     mutationFn: () => {
-      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
-      return program.methods.heresy().accounts({ stakeMint: stateAccount.data?.stakeMint }).rpc();
+      return program.methods.heresy().accounts({ stakeMint: STAKE_MINT }).rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
-      return accountQuery.refetch()
+      return devotionQuery.refetch()
     },
   })
 
   return {
-    accountQuery,
+    devotionQuery,
     devoteMutation,
     waverMutation,
     heresyMutation,
