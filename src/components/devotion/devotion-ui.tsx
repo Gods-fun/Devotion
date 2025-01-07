@@ -8,7 +8,7 @@ import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-a
 import { useWallet } from '@solana/wallet-adapter-react'
 
 export function DevotionCreate() {
-  const { initialize } = useDevotionProgram()
+  const { initialize, stateAccount } = useDevotionProgram()
   const { publicKey } = useWallet()
   const [interval, setInterval] = useState('')
   const [maxDevotionCharge, setMaxDevotionCharge] = useState('')
@@ -16,14 +16,22 @@ export function DevotionCreate() {
 
   const isFormValid = interval.length > 0 && maxDevotionCharge.length > 0 && mint.length > 0
 
-  const handleSubmit = () => {
-    if (isFormValid) {
-      initialize.mutateAsync({
-        interval: parseInt(interval),
-        maxDevotionCharge: parseInt(maxDevotionCharge),
-        mint: mint,
-      })
-    }
+  // If loading, show loading spinner
+  if (stateAccount.isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
+  }
+
+  // If program is already initialized, don't show the form
+  if (stateAccount.data) {
+    return (
+      <div className="alert alert-info">
+        <span>Program has already been initialized.</span>
+      </div>
+    )
   }
 
   if (!publicKey) {
@@ -55,7 +63,7 @@ export function DevotionCreate() {
       />
       <button
         className="btn btn-xs lg:btn-md btn-primary"
-        onClick={handleSubmit}
+        onClick={() => handleSubmit()}
         disabled={initialize.isPending || !isFormValid}
       >
         Create {initialize.isPending && '...'}
@@ -69,13 +77,17 @@ export function DevotionList() {
   const { getProgramAccount, stateAccount, devotedAccounts } = useDevotionProgram()
 
   if (getProgramAccount.isLoading || devotedAccounts.isLoading) {
-    return <span className="loading loading-spinner loading-lg"></span>
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
   }
 
   if (!getProgramAccount.data?.value) {
     return (
       <div className="alert alert-info flex justify-center">
-        <span>Program account not found. Make sure you have deployed the program and are on the correct cluster.</span>
+        <span>Program account not found.</span>
       </div>
     )
   }
@@ -168,7 +180,11 @@ function TotalDevotedCard() {
   const { totalDevotedAccount } = useDevotionProgram()
 
   if (totalDevotedAccount.isLoading) {
-    return <span className="loading loading-spinner loading-lg"></span>
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
   }
 
   return (
@@ -185,14 +201,24 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const { devotionQuery, devoteMutation, waverMutation, heresyMutation } = useDevotionProgramAccount({
     account,
   })
+  const { stateAccount } = useDevotionProgram()
   const [devoteAmount, setDevoteAmount] = useState('')
   const [waverAmount, setWaverAmount] = useState('')
 
   if (devotionQuery.isLoading) {
-    return <span className="loading loading-spinner loading-lg"></span>
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
   }
 
   if (!devotionQuery.data) return null
+
+  const decimals = stateAccount.data?.decimals ?? 0
+  const displayAmount = (amount: number) => {
+    return (amount / Math.pow(10, decimals)).toFixed(decimals)
+  }
 
   return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content">
@@ -202,7 +228,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
         <div className="stats stats-vertical shadow">
           <div className="stat">
             <div className="stat-title">Devoted Amount</div>
-            <div className="stat-value">{devotionQuery.data.amount.toString()}</div>
+            <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
           </div>
           <div className="stat">
             <div className="stat-title">Residual Devotion</div>
@@ -215,6 +241,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
           <div className="flex gap-2">
             <input
               type="number"
+              step="any"
               placeholder="Amount"
               value={devoteAmount}
               onChange={(e) => setDevoteAmount(e.target.value)}
@@ -222,7 +249,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
             />
             <button
               className="btn btn-primary"
-              onClick={() => devoteMutation.mutateAsync({ amount: parseInt(devoteAmount) })}
+              onClick={() => devoteMutation.mutateAsync({ amount: parseFloat(devoteAmount) })}
               disabled={devoteMutation.isPending || !devoteAmount}
             >
               Devote More
@@ -233,6 +260,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
           <div className="flex gap-2">
             <input
               type="number"
+              step="any"
               placeholder="Amount"
               value={waverAmount}
               onChange={(e) => setWaverAmount(e.target.value)}
@@ -240,7 +268,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
             />
             <button
               className="btn btn-secondary"
-              onClick={() => waverMutation.mutateAsync({ amount: parseInt(waverAmount) })}
+              onClick={() => waverMutation.mutateAsync({ amount: parseFloat(waverAmount) })}
               disabled={waverMutation.isPending || !waverAmount}
             >
               Waver

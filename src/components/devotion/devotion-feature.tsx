@@ -16,7 +16,7 @@ export default function DevotionFeature() {
       <AppHero
         title="Devotion"
         subtitle={
-          'Create a new account by clicking the "Create" button. The state of a account is stored on-chain and can be manipulated by calling the program\'s methods (increment, decrement, set, and close).'
+          'Initialize the devotion program by inputting your interval, max devotion charge and token.  Devote new tokens, waver in your devotion to the gods or commit heresy.'
         }
       >
         <p className="mb-6">

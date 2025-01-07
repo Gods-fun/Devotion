@@ -25,8 +25,6 @@ interface WaverArgs {
   amount: number
 }
 
-const STAKE_MINT = new PublicKey('GZnHRJqhDAymatpB7TjgyEy7AW59rW9rgpbkxa4tysgS')
-
 export function useDevotionProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -62,10 +60,10 @@ export function useDevotionProgram() {
 
   const initialize = useMutation<string, Error, InitializeArgs>({
     mutationKey: ['devotion', 'initialize', { cluster }],
-    mutationFn: ({ interval, maxDevotionCharge }: InitializeArgs) =>
+    mutationFn: ({ interval, maxDevotionCharge, mint }: InitializeArgs) =>
       program.methods
         .initialize(new BN(interval), new BN(maxDevotionCharge))
-        .accounts({ stakeMint: STAKE_MINT })
+        .accounts({ stakeMint: new PublicKey(mint) })
         .rpc(),
     onSuccess: (signature) => {
       transactionToast(signature)
@@ -106,36 +104,58 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const devoteMutation = useMutation<string, Error, DevoteArgs>({
     mutationKey: ['devotion', 'devote', { cluster, account }],
     mutationFn: ({ amount }: DevoteArgs) => {
+      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
+      
+      const decimals = stateAccount.data.decimals;
+      const scaledAmount = new BN(amount * Math.pow(10, decimals));
+      
+      console.log('Devoting amount:', amount, 'Scaled amount:', scaledAmount.toString());
+      
       return program.methods
-        .devote(new BN(amount))
-        .accounts({ stakeMint: STAKE_MINT })
+        .devote(scaledAmount)
+        .accounts({ stakeMint: stateAccount.data.stakeMint })
         .rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
       return devotionQuery.refetch()
     },
-    onError: () => toast.error('Failed to devote'),
+    onError: (error) => {
+      console.error('Devote error:', error);
+      toast.error('Failed to devote');
+    },
   })
 
   const waverMutation = useMutation<string, Error, WaverArgs>({
     mutationKey: ['devotion', 'waver', { cluster, account }],
     mutationFn: ({ amount }: WaverArgs) => {
+      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
+      
+      const decimals = stateAccount.data.decimals;
+      const scaledAmount = new BN(amount * Math.pow(10, decimals));
+      
+      console.log('Wavering amount:', amount, 'Scaled amount:', scaledAmount.toString());
+      
       return program.methods
-        .waver(new BN(amount))
-        .accounts({ stakeMint: STAKE_MINT })
+        .waver(scaledAmount)
+        .accounts({ stakeMint: stateAccount.data.stakeMint })
         .rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
       return devotionQuery.refetch()
+    },
+    onError: (error) => {
+      console.error('Waver error:', error);
+      toast.error('Failed to waver');
     },
   })
 
   const heresyMutation = useMutation<string, Error>({
     mutationKey: ['devotion', 'heresy', { cluster, account }],
     mutationFn: () => {
-      return program.methods.heresy().accounts({ stakeMint: STAKE_MINT }).rpc();
+      if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
+      return program.methods.heresy().accounts({ stakeMint: stateAccount.data?.stakeMint }).rpc();
     },
     onSuccess: (tx) => {
       transactionToast(tx)
