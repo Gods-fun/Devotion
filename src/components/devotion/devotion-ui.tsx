@@ -87,9 +87,9 @@ export function DevotionCreate() {
 
 export function DevotionList() {
   const { publicKey } = useWallet()
-  const { getProgramAccount, stateAccount, devotedAccounts } = useDevotionProgram()
+  const { getProgramAccount, stateAccount, userDevotedAccount } = useDevotionProgram()
 
-  if (getProgramAccount.isLoading || devotedAccounts.isLoading) {
+  if (getProgramAccount.isLoading || userDevotedAccount.isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <span className="loading loading-spinner loading-lg"></span>
@@ -113,21 +113,12 @@ export function DevotionList() {
     )
   }
 
-  // Find user's devoted account if it exists
-  const userDevotedAccount = publicKey 
-    ? devotedAccounts.data?.find(account => 
-        account.account.user.toString() === publicKey.toString()
-      )
-    : null;
-
   return (
     <div className="space-y-6">
       {publicKey ? (
-        userDevotedAccount ? (
-          // User has a devoted account - show their stats and actions
-          <DevotionCard account={userDevotedAccount.publicKey} />
+        userDevotedAccount.data ? (
+          <DevotionCard account={userDevotedAccount.data.publicKey} />
         ) : (
-          // User doesn't have a devoted account - show devote form
           <NewDevotionCard />
         )
       ) : (
@@ -162,11 +153,11 @@ function NewDevotionCard() {
   return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content">
       <div className="card-body items-center text-center">
-        <h2 className="card-title">Start Your Devotion</h2>
+        <h2 className="card-title">Devote</h2>
         <div className="flex gap-2">
           <input
             type="number"
-            placeholder="Amount to devote"
+            placeholder="amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className="input input-bordered w-full"
@@ -261,11 +252,14 @@ function DevotionCard({ account }: { account: PublicKey }) {
     )
   }
 
-  if (!devotionQuery.data) return null
+  if (devotionQuery.isError || !devotionQuery.data) {
+    return null;
+  }
 
   const decimals = stateAccount.data?.decimals ?? 0
-  const displayAmount = (amount: number) => {
-    return (amount / Math.pow(10, decimals)).toFixed(2)
+  const displayAmount = (amount: BN | number) => {
+    const numberAmount = amount instanceof BN ? amount.toNumber() : amount
+    return (numberAmount / Math.pow(10, decimals)).toFixed(2)
   }
 
   const handleHeresy = async () => {

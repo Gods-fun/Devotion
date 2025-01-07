@@ -10,6 +10,7 @@ import { useCluster } from '../cluster/cluster-data-access'
 import { useAnchorProvider } from '../solana/solana-provider'
 import { useTransactionToast } from '../ui/ui-layout'
 import { BN } from '@coral-xyz/anchor'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface InitializeArgs {
   interval: number
@@ -28,6 +29,7 @@ interface WaverArgs {
 export function useDevotionProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
+  const { publicKey } = useWallet()
   const transactionToast = useTransactionToast()
   const provider = useAnchorProvider()
   const programId = useMemo(() => getDevotionProgramId(cluster.network as Cluster), [cluster])
@@ -38,16 +40,6 @@ export function useDevotionProgram() {
     queryFn: () => program.account.stakeState.fetch(
       PublicKey.findProgramAddressSync(
         [Buffer.from("state")],
-        programId
-      )[0]
-    ),
-  })
-
-  const totalDevotedAccount = useQuery({
-    queryKey: ['devotion', 'total-devoted', { cluster }],
-    queryFn: () => program.account.totalDevoted.fetch(
-      PublicKey.findProgramAddressSync(
-        [Buffer.from("total-devoted")],
         programId
       )[0]
     ),
@@ -72,12 +64,23 @@ export function useDevotionProgram() {
     onError: () => toast.error('Failed to initialize account'),
   })
 
-  const devotedAccounts = useQuery({
-    queryKey: ['devotion', 'accounts', { cluster }],
+  const userDevotedAccount = useQuery({
+    queryKey: ['devotion', 'user-account', { cluster, publicKey }],
     queryFn: async () => {
-      const accounts = await program.account.devoted.all();
-      return accounts;
+      if (!publicKey) return null;
+      
+      const accounts = await program.account.devoted.all([
+        {
+          memcmp: {
+            offset: 8,
+            bytes: publicKey.toBase58()
+          }
+        }
+      ]);
+      
+      return accounts[0] || null;
     },
+    enabled: !!publicKey,
   });
 
   return {
@@ -86,19 +89,19 @@ export function useDevotionProgram() {
     getProgramAccount,
     initialize,
     stateAccount,
-    totalDevotedAccount,
-    devotedAccounts,
+    userDevotedAccount,
   }
 }
 
 export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster()
   const transactionToast = useTransactionToast()
-  const { program, stateAccount } = useDevotionProgram()
+  const { program, stateAccount, userDevotedAccount } = useDevotionProgram()
 
   const devotionQuery = useQuery({
     queryKey: ['devotion', 'fetch', { cluster, account }],
     queryFn: () => program.account.devoted.fetch(account),
+    retry: false
   })
 
   const devoteMutation = useMutation<string, Error, DevoteArgs>({
@@ -116,9 +119,12 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
         .accounts({ stakeMint: stateAccount.data.stakeMint })
         .rpc();
     },
-    onSuccess: (tx) => {
+    onSuccess: async (tx) => {
       transactionToast(tx)
-      return devotionQuery.refetch()
+      await Promise.all([
+        devotionQuery.refetch(),
+        userDevotedAccount.refetch()
+      ])
     },
     onError: (error) => {
       console.error('Devote error:', error);
@@ -157,10 +163,17 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
       if (!stateAccount.data?.stakeMint) throw new Error('Stake mint not found');
       return program.methods.heresy().accounts({ stakeMint: stateAccount.data?.stakeMint }).rpc();
     },
-    onSuccess: (tx) => {
+    onSuccess: async (tx) => {
       transactionToast(tx)
-      return devotionQuery.refetch()
+      await Promise.all([
+        devotionQuery.refetch(),
+        userDevotedAccount.refetch()
+      ])
     },
+    onError: (error) => {
+      console.error('Heresy error:', error)
+      toast.error('Failed to commit heresy')
+    }
   })
 
   return {
