@@ -78,6 +78,7 @@ pub mod devotion {
                 .ok_or(ErrorCode::MathOverflow)?;
                 
             // Calculate max_devotion using u128
+            // This might be redundant as we're already capping the seconds at max_devotion_charge
             let max_devotion = (devoted.amount as u128)
                 .checked_mul(ctx.accounts.stake_state.max_devotion_charge as u128)
                 .ok_or(ErrorCode::MathOverflow)?

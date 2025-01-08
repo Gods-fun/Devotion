@@ -196,12 +196,14 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
       const decimalsMultiplier = new BN(10).pow(new BN(stakeState.decimals))
       
       // Calculate current devotion
+      // Formula: (cappedSeconds * amount) / (decimalsMultiplier * interval)
       const devotion = new BN(cappedSeconds)
         .mul(new BN(devoted.amount))
         .div(decimalsMultiplier)
         .div(new BN(stakeState.interval))
       
       // Calculate max devotion
+      // Formula: (amount * maxDevotionCharge) / (decimalsMultiplier * interval)
       const maxDevotion = new BN(devoted.amount)
         .mul(new BN(stakeState.maxDevotionCharge))
         .div(decimalsMultiplier)
@@ -213,8 +215,7 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
       // Get the minimum of total devotion and max devotion
       const finalDevotion = BN.min(totalDevotion, maxDevotion)
       
-      // Convert to display format with 2 decimal places
-      return (finalDevotion.toNumber() / 100).toFixed(2)
+      return finalDevotion.toString()
     }
 
     // Update every second
@@ -283,10 +284,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
           <div className="stat">
             <div className="stat-title">Devoted Amount</div>
             <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-title">Residual Devotion</div>
-            <div className="stat-value">{devotionQuery.data.residualDevotion.toString()}</div>
           </div>
         </div>
 
