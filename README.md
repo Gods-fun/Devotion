@@ -105,6 +105,8 @@ solana airdrop 5 <default_key_address>
 
 - If all of your programIds were not synced before you deployed your program, your Solana program might be bricked and you are currently ripping your hair out.
 
+![lina_devotion3](https://github.com/user-attachments/assets/56f01f21-391e-401d-93c8-dc12b5466f15)
+
 ## Deploy a Test Token
 
 - [The Solana SPL-Token docs can be found here.](https://spl.solana.com/token)
@@ -115,7 +117,6 @@ solana airdrop 5 <default_key_address>
 - Airdrop Solana wallet to a test wallet from a Solana wallet in your browser (my favorite is Phantom wallet): `solana airdrop 5 <test_wallet_address>`
 - Transfer tokens and create an account for your test wallet: `spl-token transfer --fund-recipient <token_address> 1000000 <test_wallet_address>`
 
-![Uploading lina_devotion3.png…]()
 
 ## Running the Dapp
 
