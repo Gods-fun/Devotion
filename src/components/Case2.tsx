@@ -36,7 +36,7 @@ export const Case2 = () => {
     }, [api, images.length]);
 
     return (
-        <section className="w-full bg-white">
+        <section className="w-full bg-white py-8 md:py-12">
             <div className="container mx-auto px-4">
                 <div className="max-w-4xl mx-auto">
                     <Carousel 
@@ -56,14 +56,17 @@ export const Case2 = () => {
                                             alt={`God Image ${index + 1}`}
                                             fill
                                             className="object-cover"
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                             priority
                                         />
                                     </div>
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <CarouselPrevious />
-                        <CarouselNext />
+                        <div className="hidden md:block">
+                            <CarouselPrevious />
+                            <CarouselNext />
+                        </div>
                     </Carousel>
                 </div>
             </div>

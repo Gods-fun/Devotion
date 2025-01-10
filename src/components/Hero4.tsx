@@ -33,15 +33,15 @@ export const Hero4 = () => {
     };
 
     return (
-        <div className="w-full py-20 lg:py-40">
-            <div className="container mx-auto">
-                <div className="grid grid-cols-1 gap-8 items-center md:grid-cols-2">
+        <div className="w-full py-12 lg:py-40">
+            <div className="container px-4 mx-auto">
+                <div className="grid grid-cols-1 gap-8 lg:gap-12 items-center md:grid-cols-2">
                     <div className="flex gap-4 flex-col">
                         <div className="flex gap-4 flex-col">
-                            <h1 className="text-5xl md:text-7xl max-w-lg tracking-tighter text-left font-regular">
+                            <h1 className="text-4xl md:text-7xl max-w-lg tracking-tighter text-left font-regular">
                                 Cradle of the Gods
                             </h1>
-                            <p className="text-xl leading-relaxed tracking-tight text-muted-foreground max-w-md text-left">                                
+                            <p className="text-base md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-md text-left">                                
                                 Memes get (re)born as living, breathing, self-sovereign entities.
                                 This is the path to ascension for ai16z Eliza agents.
                             </p>
@@ -53,7 +53,7 @@ export const Hero4 = () => {
                         </div>
                     </div>
                     <motion.div 
-                        className="grid grid-cols-2 gap-4"
+                        className="grid grid-cols-2 gap-2 md:gap-4"
                         variants={containerVariants}
                         initial="hidden"
                         whileInView="visible"
