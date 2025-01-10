@@ -18,6 +18,9 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
   const pathname = usePathname()
   const [isOpen, setOpen] = useState(false)
 
+  // Check if we're on the devotion page
+  const isDevotionPage = pathname === '/devotion'
+
   // Define navigation items
   const navigationItems = [
     {
@@ -44,11 +47,11 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
 
   return (
     
-    <div className="h-full flex flex-col">
+    <div className={`h-full flex flex-col ${isDevotionPage ? 'bg-background' : 'bg-white'}`}>
       {/* Plausible Analytics Script */}
       <script defer data-domain="gods.fun" src="https://plausible.io/js/script.js"></script>
       
-      <div className="bg-base-300 text-neutral-content">
+      <div className={isDevotionPage ? 'bg-base-300 text-neutral-content' : 'bg-white text-black'}>
         <div className="container relative mx-auto min-h-16 flex items-center justify-between px-4">
           <Link href="/" className="font-semibold text-xl flex items-center gap-2">
             <Image
@@ -68,7 +71,7 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
                 key={item.title}
                 href={item.href}
                 target="_blank"
-                className="hover:text-primary/80 transition-colors"
+                className="hover:text-gray-600 transition-colors"
               >
                 {item.icon}
               </Link>
@@ -99,7 +102,7 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
 
           {/* Mobile Menu */}
           {isOpen && (
-            <div className="absolute top-full left-0 right-0 bg-background border-t lg:hidden">
+            <div className="absolute top-full left-0 right-0 bg-white border-t lg:hidden">
               <div className="container mx-auto py-4 px-4">
                 <nav className="flex flex-col gap-4">
                   {navigationItems.map((item) => (
@@ -132,19 +135,33 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
       </div>
       
 
-      <div className="flex-grow mx-4 lg:mx-auto">
+      <div className={`flex-grow ${
+        isDevotionPage 
+          ? 'mx-4 lg:mx-auto bg-background text-white' 
+          : 'w-full bg-white text-black'
+      }`}>
         <Suspense
           fallback={
-            <div className="text-center my-32">
+            <div className={`text-center my-32 ${isDevotionPage ? 'text-white' : 'text-black'}`}>
               <span className="loading loading-spinner loading-lg"></span>
             </div>
           }
         >
           {children}
         </Suspense>
-        <Toaster position="bottom-right" />
+        <Toaster 
+          position="bottom-right" 
+          toastOptions={{
+            style: {
+              background: isDevotionPage ? '#1f2937' : '#fff',
+              color: isDevotionPage ? '#fff' : '#000',
+            },
+          }}
+        />
       </div>
-      <footer className="w-full py-20 lg:py-32 bg-foreground text-background">
+      <footer className={`w-full py-20 lg:py-32 border-t ${
+        isDevotionPage ? 'bg-foreground text-background' : 'bg-white text-black'
+      }`}>
             <div className="container mx-auto px-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                     {/* Brand Section */}
@@ -153,7 +170,7 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
                             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
                                 gods.fun
                             </h2>
-                            <p className="mt-2 text-background/80 max-w-md">
+                            <p className="mt-2 text-gray-600 max-w-md">
                                 Interact with Divine AI Agents through token offerings and climb the celestial leaderboards.
                             </p>
                         </div>
@@ -161,35 +178,35 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
                 </div>
 
                 {/* Bottom Bar */}
-                <div className="mt-16 pt-8 border-t border-background/20">
-                    <div className="flex flex-col md:flex-row justify-between gap-4 text-sm text-background/60">
+                <div className="mt-16 pt-8 border-t border-gray-200">
+                    <div className="flex flex-col md:flex-row justify-between gap-4 text-sm text-gray-600">
                         {/* Social Links */}
                         <div className="flex gap-6">
                             <Link
                                 href="https://discord.com/invite/ai16z"
                                 target="_blank"
-                                className="hover:text-background/80 transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 <RiDiscordFill className="w-6 h-6" />
                             </Link>
                             <Link
                                 href="https://twitter.com/godsdotfun"
                                 target="_blank"
-                                className="hover:text-background/80 transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 <FiTwitter className="w-6 h-6" />
                             </Link>
                             <Link
                                 href="https://t.me/godsdotfun"
                                 target="_blank"
-                                className="hover:text-background/80 transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 <RiTelegramFill className="w-6 h-6" />
                             </Link>
                             <Link
                                 href="https://github.com/ai16z/eliza"
                                 target="_blank"
-                                className="hover:text-background/80 transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 <FiGithub className="w-6 h-6" />
                             </Link>
@@ -199,14 +216,14 @@ export function UiLayout({ children, links }: { children: ReactNode; links: { la
                             <Link
                                 target="_blank"
                                 href="https://www.google.com/intl/en/policies/terms/"
-                                className="hover:text-background transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 Terms of Service
                             </Link>
                             <Link
                                 target="_blank"
                                 href="https://www.google.com/intl/en/policies/privacy/"
-                                className="hover:text-background transition-colors"
+                                className="hover:text-gray-900 transition-colors"
                             >
                                 Privacy Policy
                             </Link>

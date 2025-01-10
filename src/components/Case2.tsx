@@ -36,8 +36,8 @@ export const Case2 = () => {
     }, [api, images.length]);
 
     return (
-        <div className="w-full py-20 lg:py-40">
-            <div className="container mx-auto">
+        <section className="w-full bg-white">
+            <div className="container mx-auto px-4">
                 <div className="max-w-4xl mx-auto">
                     <Carousel 
                         setApi={setApi} 
@@ -67,6 +67,6 @@ export const Case2 = () => {
                     </Carousel>
                 </div>
             </div>
-        </div>
+        </section>
     );
 };
