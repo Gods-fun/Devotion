@@ -449,7 +449,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
           {interestRates && (
             <>
               <div className="stat">
-                <div className="stat-title">Interest Rates</div>
+                <div className="stat-title">Devotion Rewards</div>
                 <div className="stat-desc flex flex-col gap-1">
                   <div>Daily: {interestRates.dailyInterest.toFixed(4)}</div>
                   <div>Monthly: {interestRates.projectedMonthlyInterest.toFixed(2)}</div>
