@@ -8,6 +8,25 @@ import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-a
 import { useWallet } from '@solana/wallet-adapter-react'
 import { BN } from '@coral-xyz/anchor'
 
+/**
+ * Formats large numbers to be more readable
+ * @param num - The number to format
+ * @returns Formatted string (e.g., 1.2M, 450K, etc.)
+ */
+const formatLargeNumber = (num: string | number): string => {
+  const number = Number(num);
+  if (isNaN(number)) return '0';
+  
+  if (number >= 1e9) {
+    return (number / 1e9).toFixed(1) + 'B';
+  } else if (number >= 1e6) {
+    return (number / 1e6).toFixed(1) + 'M';
+  } else if (number >= 1e3) {
+    return (number / 1e3).toFixed(1) + 'K';
+  }
+  return number.toFixed(1);
+}
+
 export function DevotionCreate() {
   const { initialize, stateAccount } = useDevotionProgram()
   const { publicKey } = useWallet()
@@ -210,8 +229,8 @@ function NewDevotionCard() {
         <div className="stats shadow mb-4">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
-            <div className="stat-value text-info">
-              {userTokenBalance.data ?? '...'}
+            <div className="stat-value text-info text-2xl lg:text-4xl">
+              {userTokenBalance.data ? formatLargeNumber(userTokenBalance.data) : '...'}
             </div>
             <div className="stat-desc">Available to devote</div>
           </div>
@@ -219,15 +238,17 @@ function NewDevotionCard() {
           {userTokenBalance.data > 0 && stateAccount.data && (
             <div className="stat">
               <div className="stat-title">Max Potential Devotion</div>
-              <div className="stat-value text-secondary">
-                {calculateMaxPotentialDevotion(userTokenBalance.data)}
+              <div className="stat-value text-secondary text-2xl lg:text-4xl">
+                {calculateMaxPotentialDevotion(userTokenBalance.data) 
+                  ? formatLargeNumber(calculateMaxPotentialDevotion(userTokenBalance.data)!) 
+                  : '0'}
               </div>
               <div className="stat-desc">If fully devoted</div>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-4 w-full">
+        <div className="flex flex-col gap-4 w-full max-w-xs">
           <div className="flex gap-2">
             <input
               type="number"
@@ -319,7 +340,9 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
   return (
     <div className="stat">
       <div className="stat-title">Current Devotion</div>
-      <div className="stat-value text-4xl">{currentDevotion}</div>
+      <div className="stat-value text-2xl lg:text-4xl">
+        {formatLargeNumber(currentDevotion)}
+      </div>
     </div>
   )
 }
@@ -396,27 +419,29 @@ function DevotionCard({ account }: { account: PublicKey }) {
         <div className="stats stats-vertical shadow">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
-            <div className="stat-value text-info">
-              {userTokenBalance.data ?? '...'}
+            <div className="stat-value text-info text-2xl lg:text-4xl">
+              {userTokenBalance.data ? formatLargeNumber(userTokenBalance.data) : '0'}
             </div>
             <div className="stat-desc">Available to devote</div>
           </div>
 
           <div className="stat">
             <div className="stat-title">Devoted Amount</div>
-            <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
+            <div className="stat-value text-2xl lg:text-4xl">
+              {formatLargeNumber(displayAmount(devotionQuery.data.amount))}
+            </div>
             <div className="stat-desc">Currently staked</div>
           </div>
           
           <DevotionScore 
             devoted={devotionQuery.data} 
-            stakeState={stateAccount.data} 
+            stakeState={stateAccount.data}
           />
           
           <div className="stat">
             <div className="stat-title">Max Devotion</div>
-            <div className="stat-value">
-              {calculateMaxDevotion(devotionQuery.data.amount)}
+            <div className="stat-value text-2xl lg:text-4xl">
+              {formatLargeNumber(calculateMaxDevotion(devotionQuery.data.amount) || '0')}
             </div>
             <div className="stat-desc">Maximum achievable</div>
           </div>
