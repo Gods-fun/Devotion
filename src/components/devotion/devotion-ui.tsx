@@ -148,27 +148,41 @@ function NewDevotionCard() {
     account: account ?? PublicKey.default,
   })
 
-  const handlePercentageClick = (percentage: number) => {
-    if (!userTokenBalance.data) return
-    const amount = (userTokenBalance.data * percentage).toFixed(2)
-    setAmount(amount.toString())
-  }
-
+  /**
+   * Calculates the maximum possible devotion score for a given token amount
+   * Formula: (amount * maxDevotionCharge) / (decimals * interval)
+   * @param tokenAmount - The amount of tokens to calculate max devotion for
+   * @returns The maximum devotion score as a string, or null if state isn't loaded
+   */
   const calculateMaxPotentialDevotion = (tokenAmount: number) => {
     if (!stateAccount.data) return null;
     
+    // Convert token amount to raw units (accounting for decimals)
     const amount = new BN(tokenAmount * Math.pow(10, stateAccount.data.decimals));
+    
+    // Calculate max devotion using the same formula as the Rust program
     const maxDevotion = amount
-      .mul(stateAccount.data.maxDevotionCharge)
-      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
-      .div(new BN(stateAccount.data.interval));
+      .mul(stateAccount.data.maxDevotionCharge)  // Multiply by max charge
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))  // Adjust for decimals
+      .div(new BN(stateAccount.data.interval));  // Divide by interval
     
     return maxDevotion.toString();
   }
 
+  /**
+   * Handles clicking on percentage buttons
+   * Calculates the amount based on the selected percentage of total balance
+   * @param percentage - The percentage as a decimal (0.25 for 25%)
+   */
+  const handlePercentageClick = (percentage: number) => {
+    if (!userTokenBalance.data) return;
+    const amount = (userTokenBalance.data * percentage).toFixed(2);
+    setAmount(amount.toString());
+  }
+
   if (!account) return null
 
-  // If balance is 0, show get tokens button
+  // Show "Get Tokens" button if user has no tokens
   if (userTokenBalance.data === 0) {
     return (
       <div className="card card-bordered border-base-300 border-4 text-neutral-content">
@@ -235,7 +249,6 @@ function NewDevotionCard() {
             </button>
           </div>
 
-          {/* Percentage buttons with updated styling */}
           <div className="flex gap-4 justify-center mt-2">
             {[25, 50, 75, 100].map((percentage) => (
               <button
@@ -351,13 +364,19 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const devotedAmount = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals)
   const interestRates = calculateInterest(devotedAmount)
 
+  /**
+   * Calculates the maximum devotion score for currently staked tokens
+   * Uses the same formula as calculateMaxPotentialDevotion
+   * @param devotedAmount - The amount of tokens currently staked (as BN)
+   * @returns The maximum devotion score as a string, or null if state isn't loaded
+   */
   const calculateMaxDevotion = (devotedAmount: BN) => {
     if (!stateAccount.data) return null;
     
     return devotedAmount
-      .mul(stateAccount.data.maxDevotionCharge)
-      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
-      .div(new BN(stateAccount.data.interval))
+      .mul(stateAccount.data.maxDevotionCharge)  // Multiply by max charge
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))  // Adjust for decimals
+      .div(new BN(stateAccount.data.interval))  // Divide by interval
       .toString();
   }
 
