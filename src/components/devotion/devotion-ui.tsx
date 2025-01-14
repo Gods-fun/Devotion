@@ -134,7 +134,7 @@ export function DevotionList() {
 function NewDevotionCard() {
   const [amount, setAmount] = useState('')
   const { publicKey } = useWallet()
-  const { stateAccount } = useDevotionProgram()
+  const { stateAccount, userTokenBalance } = useDevotionProgram()
   
   const account = useMemo(() => {
     if (!publicKey) return null
@@ -148,31 +148,83 @@ function NewDevotionCard() {
     account: account ?? PublicKey.default,
   })
 
+  const handlePercentageClick = (percentage: number) => {
+    if (!userTokenBalance.data) return
+    const amount = (userTokenBalance.data * percentage).toFixed(2)
+    setAmount(amount.toString())
+  }
+
   if (!account) return null
+
+  // If balance is 0, show get tokens button
+  if (userTokenBalance.data === 0) {
+    return (
+      <div className="card card-bordered border-base-300 border-4 text-neutral-content">
+        <div className="card-body items-center text-center">
+          <h2 className="card-title">Get Started</h2>
+          <p>You need tokens to start devoting</p>
+          <a 
+            href="https://raydium.io/swap" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn btn-primary"
+          >
+            Get Tokens
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content">
       <div className="card-body items-center text-center">
         <h2 className="card-title">Devote</h2>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            placeholder="amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="input input-bordered w-full"
-          />
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              if (amount) {
-                devoteMutation.mutateAsync({ amount: parseInt(amount) })
-              }
-            }}
-            disabled={devoteMutation.isPending || !amount}
-          >
-            Devote
-          </button>
+        
+        <div className="stats shadow mb-4">
+          <div className="stat">
+            <div className="stat-title">Wallet Balance</div>
+            <div className="stat-value text-info">
+              {userTokenBalance.data ?? '...'}
+            </div>
+            <div className="stat-desc">Available to devote</div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 w-full">
+          <div className="flex gap-2">
+            <input
+              type="number"
+              placeholder="amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input input-bordered w-full"
+            />
+            <button
+              className="btn btn-xs lg:btn-md btn-primary"
+              onClick={() => {
+                if (amount) {
+                  devoteMutation.mutateAsync({ amount: parseFloat(amount) })
+                }
+              }}
+              disabled={devoteMutation.isPending || !amount}
+            >
+              Devote
+            </button>
+          </div>
+
+          {/* Percentage buttons with updated styling */}
+          <div className="flex gap-4 justify-center mt-2">
+            {[25, 50, 75, 100].map((percentage) => (
+              <button
+                key={percentage}
+                className="btn btn-secondary min-w-[80px]"
+                onClick={() => handlePercentageClick(percentage / 100)}
+              >
+                {percentage}%
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -241,11 +293,12 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const { devotionQuery, devoteMutation, waverMutation, heresyMutation } = useDevotionProgramAccount({
     account,
   })
-  const { stateAccount } = useDevotionProgram()
+  const { stateAccount, calculateInterest, userTokenBalance } = useDevotionProgram()
   const [devoteAmount, setDevoteAmount] = useState('')
   const [waverAmount, setWaverAmount] = useState('')
 
   if (devotionQuery.isLoading) {
+    console.log(userTokenBalance)
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <span className="loading loading-spinner loading-lg"></span>
@@ -259,9 +312,22 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
   const decimals = stateAccount.data?.decimals ?? 0
   const displayAmount = (amount: BN | number) => {
-    const numberAmount = amount instanceof BN ? amount.toNumber() : amount
-    return (numberAmount / Math.pow(10, decimals)).toFixed(2)
+    console.log('Raw amount:', amount);
+    let numberAmount: number;
+    
+    if (typeof amount === 'string') {
+      // Handle string input by converting to BN first
+      numberAmount = new BN(amount).toNumber();
+    } else {
+      numberAmount = amount instanceof BN ? amount.toNumber() : amount;
+    }
+    
+    console.log('Converted amount:', numberAmount);
+    return (numberAmount / Math.pow(10, decimals)).toFixed(2);
   }
+  // Calculate interest based on current devoted amount
+  const devotedAmount = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals)
+  const interestRates = calculateInterest(devotedAmount)
 
   const handleHeresy = async () => {
     try {
@@ -277,18 +343,40 @@ function DevotionCard({ account }: { account: PublicKey }) {
         <h2 className="card-title">Your Devotion</h2>
         
         <div className="stats stats-vertical shadow">
+          <div className="stat">
+            <div className="stat-title">Wallet Balance</div>
+            <div className="stat-value text-info">
+              {userTokenBalance.data ?? '...'}
+            </div>
+            <div className="stat-desc">Available to devote</div>
+          </div>
+
+          <div className="stat">
+            <div className="stat-title">Devoted Amount</div>
+            <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
+            <div className="stat-desc">Currently staked</div>
+          </div>
+          
           <DevotionScore 
             devoted={devotionQuery.data} 
             stakeState={stateAccount.data} 
           />
-          <div className="stat">
-            <div className="stat-title">Devoted Amount</div>
-            <div className="stat-value">{displayAmount(devotionQuery.data.amount)}</div>
-          </div>
+          
+          {interestRates && (
+            <>
+              <div className="stat">
+                <div className="stat-title">Interest Rates</div>
+                <div className="stat-desc flex flex-col gap-1">
+                  <div>Daily: {interestRates.dailyInterest.toFixed(4)}</div>
+                  <div>Monthly: {interestRates.projectedMonthlyInterest.toFixed(2)}</div>
+                  <div>Yearly: {interestRates.projectedYearlyInterest.toFixed(2)}</div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          {/* Devote more tokens */}
           <div className="flex gap-2">
             <input
               type="number"
@@ -307,7 +395,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </button>
           </div>
 
-          {/* Waver (unstake) tokens */}
           <div className="flex gap-2">
             <input
               type="number"
@@ -326,7 +413,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </button>
           </div>
 
-          {/* Heresy (close account) */}
           <button
             className="btn btn-error"
             onClick={handleHeresy}
