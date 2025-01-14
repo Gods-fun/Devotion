@@ -154,6 +154,18 @@ function NewDevotionCard() {
     setAmount(amount.toString())
   }
 
+  const calculateMaxPotentialDevotion = (tokenAmount: number) => {
+    if (!stateAccount.data) return null;
+    
+    const amount = new BN(tokenAmount * Math.pow(10, stateAccount.data.decimals));
+    const maxDevotion = amount
+      .mul(stateAccount.data.maxDevotionCharge)
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
+      .div(new BN(stateAccount.data.interval));
+    
+    return maxDevotion.toString();
+  }
+
   if (!account) return null
 
   // If balance is 0, show get tokens button
@@ -189,6 +201,16 @@ function NewDevotionCard() {
             </div>
             <div className="stat-desc">Available to devote</div>
           </div>
+          
+          {userTokenBalance.data > 0 && stateAccount.data && (
+            <div className="stat">
+              <div className="stat-title">Max Potential Devotion</div>
+              <div className="stat-value text-secondary">
+                {calculateMaxPotentialDevotion(userTokenBalance.data)}
+              </div>
+              <div className="stat-desc">If fully devoted</div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 w-full">
@@ -329,6 +351,16 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const devotedAmount = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals)
   const interestRates = calculateInterest(devotedAmount)
 
+  const calculateMaxDevotion = (devotedAmount: BN) => {
+    if (!stateAccount.data) return null;
+    
+    return devotedAmount
+      .mul(stateAccount.data.maxDevotionCharge)
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
+      .div(new BN(stateAccount.data.interval))
+      .toString();
+  }
+
   const handleHeresy = async () => {
     try {
       await heresyMutation.mutateAsync()
@@ -361,6 +393,14 @@ function DevotionCard({ account }: { account: PublicKey }) {
             devoted={devotionQuery.data} 
             stakeState={stateAccount.data} 
           />
+          
+          <div className="stat">
+            <div className="stat-title">Max Devotion</div>
+            <div className="stat-value">
+              {calculateMaxDevotion(devotionQuery.data.amount)}
+            </div>
+            <div className="stat-desc">Maximum achievable</div>
+          </div>
           
           {interestRates && (
             <>
