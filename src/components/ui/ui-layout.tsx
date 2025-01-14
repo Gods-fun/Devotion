@@ -143,4 +143,3 @@ export function ellipsify(str = '', len = 4) {
     return str.substring(0, len) + '..' + str.substring(str.length - len)
   }
   return str
-}
