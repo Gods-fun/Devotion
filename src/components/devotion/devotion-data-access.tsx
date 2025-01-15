@@ -11,6 +11,7 @@ import { useAnchorProvider } from '../solana/solana-provider'
 import { useTransactionToast } from '../ui/ui-layout'
 import { BN } from '@coral-xyz/anchor'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { getAssociatedTokenAddressSync } from '@solana/spl-token'
 
 interface InitializeArgs {
   interval: number
@@ -24,6 +25,12 @@ interface DevoteArgs {
 
 interface WaverArgs {
   amount: number
+}
+
+interface InterestCalculation {
+  dailyInterest: number;
+  projectedMonthlyInterest: number;
+  projectedYearlyInterest: number;
 }
 
 export function useDevotionProgram() {
@@ -49,6 +56,43 @@ export function useDevotionProgram() {
     queryKey: ['get-program-account', { cluster }],
     queryFn: () => connection.getParsedAccountInfo(programId),
   })
+
+  const userTokenBalance = useQuery({
+    queryKey: ['user-token-balance', { cluster, publicKey, stakeMint: stateAccount.data?.stakeMint }],
+    queryFn: async () => {
+      if (!publicKey || !stateAccount.data?.stakeMint) return null;
+      
+      try {
+        // Get all token accounts for this wallet
+        const accounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+          mint: stateAccount.data.stakeMint
+        });
+
+        // Log for debugging
+        console.log('Token accounts:', accounts);
+
+        // If no token accounts found, try to get the associated token account
+        if (accounts.value.length === 0) {
+          const ata = await connection.getTokenAccountBalance(
+            getAssociatedTokenAddressSync(
+              stateAccount.data.stakeMint,
+              publicKey
+            )
+          );
+          return ata.value.uiAmount;
+        }
+
+        // Return the balance of the first account found
+        const balance = accounts.value[0]?.account.data.parsed.info.tokenAmount.uiAmount;
+        console.log('Found balance:', balance);
+        return balance || 0;
+      } catch (error) {
+        console.error('Error fetching token balance:', error);
+        return 0;
+      }
+    },
+    enabled: !!publicKey && !!stateAccount.data?.stakeMint,
+  });
 
   const initialize = useMutation<string, Error, InitializeArgs>({
     mutationKey: ['devotion', 'initialize', { cluster }],
@@ -83,6 +127,22 @@ export function useDevotionProgram() {
     enabled: !!publicKey,
   });
 
+  const calculateInterest = (devotedBalance: number): InterestCalculation | null => {
+    if (!stateAccount.data?.interval) return null;
+    
+    // Convert interval from seconds to days
+    const intervalInDays = stateAccount.data.interval.toNumber() / (24 * 60 * 60);
+    
+    // Calculate daily interest rate (0.1% per day per devoted token)
+    const dailyInterest = devotedBalance * (0.001 / intervalInDays);
+    
+    return {
+      dailyInterest,
+      projectedMonthlyInterest: dailyInterest * 30,
+      projectedYearlyInterest: dailyInterest * 365,
+    };
+  };
+
   return {
     program,
     programId,
@@ -90,6 +150,8 @@ export function useDevotionProgram() {
     initialize,
     stateAccount,
     userDevotedAccount,
+    userTokenBalance,
+    calculateInterest,
   }
 }
 
