@@ -8,11 +8,6 @@ import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-a
 import { useWallet } from '@solana/wallet-adapter-react'
 import { BN } from '@coral-xyz/anchor'
 
-/**
- * Formats large numbers to be more readable
- * @param num - The number to format
- * @returns Formatted string (e.g., 1.2M, 450K, etc.)
- */
 const formatLargeNumber = (num: string | number): string => {
   const number = Number(num);
   if (isNaN(number)) return '0';
@@ -36,7 +31,6 @@ export function DevotionCreate() {
 
   const isFormValid = interval.length > 0 && maxDevotionCharge.length > 0 && mint.length > 0
 
-  // If loading, show loading spinner
   if (stateAccount.isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
@@ -45,7 +39,6 @@ export function DevotionCreate() {
     )
   }
 
-  // If program is already initialized, don't show the form
   if (stateAccount.data) {
     return (
       <div className="alert alert-info">
@@ -71,7 +64,7 @@ export function DevotionCreate() {
   }
 
   return (
-    <div className="flex flex-col gap-4 items-center">
+    <div className="flex flex-col gap-4 items-center w-full px-4">
       <input
         type="number"
         placeholder="Interval"
@@ -94,7 +87,7 @@ export function DevotionCreate() {
         className="input input-bordered w-full max-w-xs"
       />
       <button
-        className="btn btn-xs lg:btn-md btn-primary"
+        className="btn btn-xs lg:btn-md btn-primary w-full max-w-xs"
         onClick={handleSubmit}
         disabled={initialize.isPending || !isFormValid}
       >
@@ -133,7 +126,7 @@ export function DevotionList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full px-4">
       {publicKey ? (
         userDevotedAccount.data ? (
           <DevotionCard account={userDevotedAccount.data.publicKey} />
@@ -167,32 +160,16 @@ function NewDevotionCard() {
     account: account ?? PublicKey.default,
   })
 
-  /**
-   * Calculates the maximum possible devotion score for a given token amount
-   * Formula: (amount * maxDevotionCharge) / (decimals * interval)
-   * @param tokenAmount - The amount of tokens to calculate max devotion for
-   * @returns The maximum devotion score as a string, or null if state isn't loaded
-   */
   const calculateMaxPotentialDevotion = (tokenAmount: number) => {
     if (!stateAccount.data) return null;
-    
-    // Convert token amount to raw units (accounting for decimals)
     const amount = new BN(tokenAmount * Math.pow(10, stateAccount.data.decimals));
-    
-    // Calculate max devotion using the same formula as the Rust program
     const maxDevotion = amount
-      .mul(stateAccount.data.maxDevotionCharge)  // Multiply by max charge
-      .div(new BN(Math.pow(10, stateAccount.data.decimals)))  // Adjust for decimals
-      .div(new BN(stateAccount.data.interval));  // Divide by interval
-    
+      .mul(stateAccount.data.maxDevotionCharge)
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
+      .div(new BN(stateAccount.data.interval));
     return maxDevotion.toString();
   }
 
-  /**
-   * Handles clicking on percentage buttons
-   * Calculates the amount based on the selected percentage of total balance
-   * @param percentage - The percentage as a decimal (0.25 for 25%)
-   */
   const handlePercentageClick = (percentage: number) => {
     if (!userTokenBalance.data) return;
     const amount = (userTokenBalance.data * percentage).toFixed(2);
@@ -201,18 +178,17 @@ function NewDevotionCard() {
 
   if (!account) return null
 
-  // Show "Get Tokens" button if user has no tokens
   if (userTokenBalance.data === 0) {
     return (
-      <div className="card card-bordered border-base-300 border-4 text-neutral-content">
-        <div className="card-body items-center text-center">
+      <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
+        <div className="card-body items-center text-center p-4 sm:p-6">
           <h2 className="card-title">Get Started</h2>
           <p>You need tokens to start devoting</p>
           <a 
             href="https://raydium.io/swap" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto"
           >
             Get Tokens
           </a>
@@ -222,14 +198,13 @@ function NewDevotionCard() {
   }
 
   return (
-    <div className="card card-bordered border-base-300 border-4 text-neutral-content">
-      <div className="card-body items-center text-center">
-        <h2 className="card-title">Devote</h2>
+    <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
+      <div className="card-body items-center text-center p-4 sm:p-6">
         
-        <div className="stats shadow mb-4">
+      <div className="stats stats-vertical lg:stats-horizontal shadow w-full max-w-3xl [&_.stat]:!border-none">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
-            <div className="stat-value text-info text-2xl lg:text-4xl">
+            <div className="stat-value text-info text-3xl lg:text-4xl">
               {userTokenBalance.data ? formatLargeNumber(userTokenBalance.data) : '...'}
             </div>
             <div className="stat-desc">Available to devote</div>
@@ -238,7 +213,7 @@ function NewDevotionCard() {
           {userTokenBalance.data > 0 && stateAccount.data && (
             <div className="stat">
               <div className="stat-title">Max Potential Devotion</div>
-              <div className="stat-value text-secondary text-2xl lg:text-4xl">
+              <div className="stat-value text-secondary text-3xl lg:text-4xl">
                 {calculateMaxPotentialDevotion(userTokenBalance.data) 
                   ? formatLargeNumber(calculateMaxPotentialDevotion(userTokenBalance.data)!) 
                   : '0'}
@@ -248,17 +223,19 @@ function NewDevotionCard() {
           )}
         </div>
 
+        <p className="text-sm mb-4 text-center w-full">You can retrieve your offering anytime.</p>
+
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Amount of tokens to stake.">
             <input
               type="number"
               placeholder="amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="input input-bordered w-full"
+              className="input input-bordered w-full placeholder:text-gray-500"
             />
             <button
-              className="btn btn-xs lg:btn-md btn-primary"
+              className="btn btn-primary w-full sm:w-auto"
               onClick={() => {
                 if (amount) {
                   devoteMutation.mutateAsync({ amount: parseFloat(amount) })
@@ -270,11 +247,16 @@ function NewDevotionCard() {
             </button>
           </div>
 
-          <div className="flex gap-4 justify-center mt-2">
-            {[25, 50, 75, 100].map((percentage) => (
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-4 justify-center mt-2">
+            {[
+              { percentage: 25, color: 'bg-purple-400 hover:bg-purple-500' },
+              { percentage: 50, color: 'bg-purple-500 hover:bg-purple-600' },
+              { percentage: 75, color: 'bg-purple-600 hover:bg-purple-800' },
+              { percentage: 100, color: 'bg-purple-700 hover:bg-purple-950' }
+            ].map(({ percentage, color }) => (
               <button
                 key={percentage}
-                className="btn btn-secondary min-w-[80px]"
+                className={`btn ${color} text-white border-none min-w-[60px] sm:min-w-[80px]`}
                 onClick={() => handlePercentageClick(percentage / 100)}
               >
                 {percentage}%
@@ -296,42 +278,29 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
 
       const currentTime = Math.floor(Date.now() / 1000)
       const secondsStaked = Math.max(0, currentTime - devoted.lastStakeTimestamp.toNumber())
-      
-      // Cap the seconds at maximum multiplier
       const cappedSeconds = Math.min(secondsStaked, stakeState.maxDevotionCharge.toNumber())
-      
-      // Calculate using the same logic as the Rust program
       const decimalsMultiplier = new BN(10).pow(new BN(stakeState.decimals))
       
-      // Calculate current devotion
-      // Formula: (cappedSeconds * amount) / (decimalsMultiplier * interval)
       const devotion = new BN(cappedSeconds)
         .mul(new BN(devoted.amount))
         .div(decimalsMultiplier)
         .div(new BN(stakeState.interval))
       
-      // Calculate max devotion
-      // Formula: (amount * maxDevotionCharge) / (decimalsMultiplier * interval)
       const maxDevotion = new BN(devoted.amount)
         .mul(new BN(stakeState.maxDevotionCharge))
         .div(decimalsMultiplier)
         .div(new BN(stakeState.interval))
       
-      // Add residual devotion
       const totalDevotion = devotion.add(new BN(devoted.residualDevotion))
-      
-      // Get the minimum of total devotion and max devotion
       const finalDevotion = BN.min(totalDevotion, maxDevotion)
       
       return finalDevotion.toString()
     }
 
-    // Update every second
     const interval = setInterval(() => {
       setCurrentDevotion(calculateDevotion())
     }, 1000)
 
-    // Initial calculation
     setCurrentDevotion(calculateDevotion())
 
     return () => clearInterval(interval)
@@ -340,7 +309,7 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
   return (
     <div className="stat">
       <div className="stat-title">Current Devotion</div>
-      <div className="stat-value text-2xl lg:text-4xl">
+      <div className="stat-value text-3xl text-yellow-200 lg:text-4xl">
         {formatLargeNumber(currentDevotion)}
       </div>
     </div>
@@ -356,7 +325,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const [waverAmount, setWaverAmount] = useState('')
 
   if (devotionQuery.isLoading) {
-    console.log(userTokenBalance)
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <span className="loading loading-spinner loading-lg"></span>
@@ -370,36 +338,24 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
   const decimals = stateAccount.data?.decimals ?? 0
   const displayAmount = (amount: BN | number) => {
-    console.log('Raw amount:', amount);
     let numberAmount: number;
-    
     if (typeof amount === 'string') {
-      // Handle string input by converting to BN first
       numberAmount = new BN(amount).toNumber();
     } else {
       numberAmount = amount instanceof BN ? amount.toNumber() : amount;
     }
-    
-    console.log('Converted amount:', numberAmount);
     return (numberAmount / Math.pow(10, decimals)).toFixed(2);
   }
-  // Calculate interest based on current devoted amount
+
   const devotedAmount = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals)
   const interestRates = calculateInterest(devotedAmount)
 
-  /**
-   * Calculates the maximum devotion score for currently staked tokens
-   * Uses the same formula as calculateMaxPotentialDevotion
-   * @param devotedAmount - The amount of tokens currently staked (as BN)
-   * @returns The maximum devotion score as a string, or null if state isn't loaded
-   */
   const calculateMaxDevotion = (devotedAmount: BN) => {
     if (!stateAccount.data) return null;
-    
     return devotedAmount
-      .mul(stateAccount.data.maxDevotionCharge)  // Multiply by max charge
-      .div(new BN(Math.pow(10, stateAccount.data.decimals)))  // Adjust for decimals
-      .div(new BN(stateAccount.data.interval))  // Divide by interval
+      .mul(stateAccount.data.maxDevotionCharge)
+      .div(new BN(Math.pow(10, stateAccount.data.decimals)))
+      .div(new BN(stateAccount.data.interval))
       .toString();
   }
 
@@ -412,14 +368,14 @@ function DevotionCard({ account }: { account: PublicKey }) {
   }
 
   return (
-    <div className="card card-bordered border-base-300 border-4 text-neutral-content">
-      <div className="card-body items-center text-center">
+    <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
+      <div className="card-body items-center text-center p-4 sm:p-6">
         <h2 className="card-title">Your Devotion</h2>
         
-        <div className="stats stats-vertical shadow">
+        <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
-            <div className="stat-value text-info text-2xl lg:text-4xl">
+            <div className="stat-value text-3xl text-info lg:text-4xl">
               {userTokenBalance.data ? formatLargeNumber(userTokenBalance.data) : '0'}
             </div>
             <div className="stat-desc">Available to devote</div>
@@ -427,7 +383,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
           <div className="stat">
             <div className="stat-title">Devoted Amount</div>
-            <div className="stat-value text-2xl lg:text-4xl">
+            <div className="stat-value text-3xl text-info lg:text-4xl">
               {formatLargeNumber(displayAmount(devotionQuery.data.amount))}
             </div>
             <div className="stat-desc">Currently staked</div>
@@ -440,38 +396,36 @@ function DevotionCard({ account }: { account: PublicKey }) {
           
           <div className="stat">
             <div className="stat-title">Max Devotion</div>
-            <div className="stat-value text-2xl lg:text-4xl">
+            <div className="stat-value text-3xl text-info lg:text-4xl">
               {formatLargeNumber(calculateMaxDevotion(devotionQuery.data.amount) || '0')}
             </div>
             <div className="stat-desc">Maximum achievable</div>
           </div>
           
           {interestRates && (
-            <>
-              <div className="stat">
-                <div className="stat-title">Devotion Rewards</div>
-                <div className="stat-desc flex flex-col gap-1">
-                  <div>Daily: {interestRates.dailyInterest.toFixed(4)}</div>
-                  <div>Monthly: {interestRates.projectedMonthlyInterest.toFixed(2)}</div>
-                  <div>Yearly: {interestRates.projectedYearlyInterest.toFixed(2)}</div>
-                </div>
+            <div className="stat">
+              <div className="stat-title">Devotion Rewards</div>
+              <div className="stat-desc flex flex-col gap-1">
+                <div>Daily: <span className="text-info">{Math.round(interestRates.dailyInterest)}</span></div>
+                <div>Monthly: <span className="text-info">{Math.round(interestRates.projectedMonthlyInterest)}</span></div>
+                <div>Yearly: <span className="text-info">{Math.round(interestRates.projectedYearlyInterest)}</span></div>
               </div>
-            </>
+            </div>
           )}
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Devote more tokens to the gods.">
             <input
               type="number"
               step="any"
-              placeholder="Amount"
+              placeholder="amount"
               value={devoteAmount}
               onChange={(e) => setDevoteAmount(e.target.value)}
-              className="input input-bordered w-full"
+              className="input input-bordered w-full placeholder:text-gray-500"
             />
             <button
-              className="btn btn-primary"
+              className="btn btn-primary w-full sm:w-auto"
               onClick={() => devoteMutation.mutateAsync({ amount: parseFloat(devoteAmount) })}
               disabled={devoteMutation.isPending || !devoteAmount}
             >
@@ -479,17 +433,17 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </button>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Retrieve devoted tokens from the gods. WARNING: This will reset your devotion to 0.">
             <input
               type="number"
               step="any"
-              placeholder="Amount"
+              placeholder="amount"
               value={waverAmount}
               onChange={(e) => setWaverAmount(e.target.value)}
-              className="input input-bordered w-full"
+              className="input input-bordered w-full placeholder:text-gray-500"
             />
             <button
-              className="btn btn-secondary"
+              className="btn btn-secondary w-full sm:w-auto"
               onClick={() => waverMutation.mutateAsync({ amount: parseFloat(waverAmount) })}
               disabled={waverMutation.isPending || !waverAmount}
             >
@@ -498,7 +452,8 @@ function DevotionCard({ account }: { account: PublicKey }) {
           </div>
 
           <button
-            className="btn btn-error"
+            className="btn btn-error tooltip w-full hover:bg-red-900 hover:border-red-950" 
+            data-tip="Retrieve all devoted tokens from the gods. WARNING: This will reset your devotion and may wrath the gods."
             onClick={handleHeresy}
             disabled={heresyMutation.isPending}
           >
