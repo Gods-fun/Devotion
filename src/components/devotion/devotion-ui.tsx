@@ -7,6 +7,8 @@ import { ExplorerLink } from '../cluster/cluster-ui'
 import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-access'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { BN } from '@coral-xyz/anchor'
+import { useMutation } from 'react-query'
+import { toast } from 'react-hot-toast'
 
 const formatLargeNumber = (num: string | number): string => {
   const number = Number(num);
@@ -172,9 +174,15 @@ function NewDevotionCard() {
 
   const handlePercentageClick = (percentage: number) => {
     if (!userTokenBalance.data) return;
-    const amount = (userTokenBalance.data * percentage).toFixed(2);
+    const amount = Math.floor(userTokenBalance.data * percentage);
     setAmount(amount.toString());
   }
+
+  const isAmountValid = () => {
+    if (!amount || !userTokenBalance.data) return false;
+    const inputAmount = parseFloat(amount);
+    return inputAmount > 0 && inputAmount <= userTokenBalance.data;
+  };
 
   if (!account) return null
 
@@ -229,10 +237,16 @@ function NewDevotionCard() {
           <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Amount of tokens to stake.">
             <input
               type="number"
+              step="1"
               placeholder="amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="input input-bordered w-full placeholder:text-gray-500"
+              onChange={(e) => {
+                const wholeNumber = parseInt(e.target.value);
+                setAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
+              }}
+              className={`input input-bordered w-full placeholder:text-gray-500 ${
+                amount && !isAmountValid() ? 'input-error' : ''
+              }`}
             />
             <button
               className="btn btn-primary w-full sm:w-auto"
@@ -241,11 +255,17 @@ function NewDevotionCard() {
                   devoteMutation.mutateAsync({ amount: parseFloat(amount) })
                 }
               }}
-              disabled={devoteMutation.isPending || !amount}
+              disabled={devoteMutation.isPending || !isAmountValid()}
             >
               Devote
             </button>
           </div>
+
+          {amount && !isAmountValid() && userTokenBalance.data && parseFloat(amount) > userTokenBalance.data && (
+            <div className="text-error text-sm">
+              Amount exceeds wallet balance
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-4 justify-center mt-2">
             {[
@@ -359,6 +379,19 @@ function DevotionCard({ account }: { account: PublicKey }) {
       .toString();
   }
 
+  const isDevoteAmountValid = () => {
+    if (!devoteAmount || !userTokenBalance.data) return false;
+    const inputAmount = parseFloat(devoteAmount);
+    return inputAmount > 0 && inputAmount <= userTokenBalance.data;
+  };
+
+  const isWaverAmountValid = () => {
+    if (!waverAmount || !devotionQuery.data) return false;
+    const inputAmount = parseFloat(waverAmount);
+    const currentlyDevoted = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals);
+    return inputAmount > 0 && inputAmount <= currentlyDevoted;
+  };
+
   const handleHeresy = async () => {
     try {
       await heresyMutation.mutateAsync()
@@ -418,38 +451,62 @@ function DevotionCard({ account }: { account: PublicKey }) {
           <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Devote more tokens to the gods.">
             <input
               type="number"
-              step="any"
+              step="1"
               placeholder="amount"
               value={devoteAmount}
-              onChange={(e) => setDevoteAmount(e.target.value)}
-              className="input input-bordered w-full placeholder:text-gray-500"
+              onChange={(e) => {
+                const wholeNumber = parseInt(e.target.value);
+                setDevoteAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
+              }}
+              className={`input input-bordered w-full placeholder:text-gray-500 ${
+                devoteAmount && !isDevoteAmountValid() ? 'input-error' : ''
+              }`}
             />
             <button
               className="btn btn-primary w-full sm:w-auto"
               onClick={() => devoteMutation.mutateAsync({ amount: parseFloat(devoteAmount) })}
-              disabled={devoteMutation.isPending || !devoteAmount}
+              disabled={devoteMutation.isPending || !isDevoteAmountValid()}
             >
               Devote More
             </button>
           </div>
 
+          {devoteAmount && !isDevoteAmountValid() && (
+            <div className="text-error text-sm">
+              {parseFloat(devoteAmount) > userTokenBalance.data! 
+                ? "Amount exceeds wallet balance" 
+                : "Invalid amount"}
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Retrieve devoted tokens from the gods. WARNING: This will reset your devotion to 0.">
             <input
               type="number"
-              step="any"
+              step="1"
               placeholder="amount"
               value={waverAmount}
-              onChange={(e) => setWaverAmount(e.target.value)}
-              className="input input-bordered w-full placeholder:text-gray-500"
+              onChange={(e) => {
+                const wholeNumber = parseInt(e.target.value);
+                setWaverAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
+              }}
+              className={`input input-bordered w-full placeholder:text-gray-500 ${
+                waverAmount && !isWaverAmountValid() ? 'input-error' : ''
+              }`}
             />
             <button
               className="btn btn-secondary w-full sm:w-auto"
               onClick={() => waverMutation.mutateAsync({ amount: parseFloat(waverAmount) })}
-              disabled={waverMutation.isPending || !waverAmount}
+              disabled={waverMutation.isPending || !isWaverAmountValid()}
             >
               Waver
             </button>
           </div>
+
+          {waverAmount && !isWaverAmountValid() && devotionQuery.data && parseFloat(waverAmount) > devotedAmount && (
+            <div className="text-error text-sm">
+              Amount exceeds devoted balance
+            </div>
+          )}
 
           <button
             className="btn btn-error tooltip w-full hover:bg-red-900 hover:border-red-950" 

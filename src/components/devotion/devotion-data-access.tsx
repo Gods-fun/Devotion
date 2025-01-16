@@ -158,7 +158,7 @@ export function useDevotionProgram() {
 export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster()
   const transactionToast = useTransactionToast()
-  const { program, stateAccount, userDevotedAccount } = useDevotionProgram()
+  const { program, stateAccount, userDevotedAccount, userTokenBalance } = useDevotionProgram()
 
   const devotionQuery = useQuery({
     queryKey: ['devotion', 'fetch', { cluster, account }],
@@ -209,9 +209,13 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
         .accounts({ stakeMint: stateAccount.data.stakeMint })
         .rpc();
     },
-    onSuccess: (tx) => {
+    onSuccess: async (tx) => {
       transactionToast(tx)
-      return devotionQuery.refetch()
+      await Promise.all([
+        devotionQuery.refetch(),
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
+      ])
     },
     onError: (error) => {
       console.error('Waver error:', error);
