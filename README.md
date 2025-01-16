@@ -20,7 +20,7 @@ The maintainers of this repository are not responsible for any losses, damages, 
 
 ## Devotion
 
-This program brings divine economics to Solana, where your loyalty is measured in tokens and time. Use devote to stake tokens and grow your devotion over time, unlocking greater rewards in Initial Godly Offerings (IGOs). If doubts creep in, waver allows you to withdraw tokens but resets your devotion to zero. For those ready to renounce divine favor entirely, heresy lets you close your account and reclaim your tokens at the cost of eternal banishment. Curious about your standing? check_devotion calculates your accumulated loyalty, determining your allocation weight in the celestial realm. Prove your devotion, and let the gods decide your fate!
+This is antoken staking program for Solana that allows users to build up a long term score for staking tokens.  That score can affect how the agents interact with users.  It can also be consumed by other Solana programs to enable interesting game mechanics.
 
 `initialize` allows developers to set the interval for Devotion growth per token, the maximum amount of Devotion that can charge for each token, and the desired agent token's mint address
 `devote` allows users to stake tokens and build Devotion.  Devotion grows over time until the maximum devotion charge time.
