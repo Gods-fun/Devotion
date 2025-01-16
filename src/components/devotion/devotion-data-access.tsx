@@ -86,6 +86,7 @@ export function useDevotionProgram() {
       }
     },
     enabled: !!publicKey && !!stateAccount.data?.stakeMint,
+    refetchInterval: 5000,
   });
 
   const initialize = useMutation<string, Error, InitializeArgs>({
@@ -119,6 +120,7 @@ export function useDevotionProgram() {
       return accounts[0] || null;
     },
     enabled: !!publicKey,
+    refetchInterval: 5000,
   });
 
   return {
@@ -160,10 +162,22 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
     },
     onSuccess: async (tx) => {
       transactionToast(tx)
-      await Promise.all([
+      
+      // Start immediate refetch
+      Promise.all([
         devotionQuery.refetch(),
-        userDevotedAccount.refetch()
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
       ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Devote error:', error);
@@ -188,11 +202,22 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
     },
     onSuccess: async (tx) => {
       transactionToast(tx)
-      await Promise.all([
+      
+      // Start immediate refetch
+      Promise.all([
         devotionQuery.refetch(),
         userDevotedAccount.refetch(),
         userTokenBalance.refetch()
       ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Waver error:', error);
@@ -208,10 +233,22 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
     },
     onSuccess: async (tx) => {
       transactionToast(tx)
-      await Promise.all([
+      
+      // Start immediate refetch
+      Promise.all([
         devotionQuery.refetch(),
-        userDevotedAccount.refetch()
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
       ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Heresy error:', error)

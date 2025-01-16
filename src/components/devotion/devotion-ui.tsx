@@ -180,30 +180,11 @@ function NewDevotionCard() {
 
   if (!account) return null
 
-  if (userTokenBalance.data === 0) {
-    return (
-      <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
-        <div className="card-body items-center text-center p-4 sm:p-6">
-          <h2 className="card-title">Get Started</h2>
-          <p>You need tokens to start devoting</p>
-          <a 
-            href="https://raydium.io/swap" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="btn btn-primary w-full sm:w-auto"
-          >
-            Get Tokens
-          </a>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
       <div className="card-body items-center text-center p-4 sm:p-6">
         
-      <div className="stats stats-vertical lg:stats-horizontal shadow w-full max-w-3xl [&_.stat]:!border-none">
+        <div className="stats stats-vertical lg:stats-horizontal shadow w-full max-w-3xl [&_.stat]:!border-none">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
             <div className="stat-value text-info text-3xl lg:text-4xl">
@@ -235,7 +216,7 @@ function NewDevotionCard() {
               const wholeNumber = parseInt(e.target.value);
               setAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
             }}
-            className={`input input-bordered w-full placeholder:text-gray-500 ${
+            className={`input input-bordered w-full placeholder:text-gray-500 text-center ${
               amount && !isAmountValid() ? 'input-error' : ''
             }`}
           />
@@ -332,7 +313,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const { devotionQuery, devoteMutation, waverMutation, heresyMutation } = useDevotionProgramAccount({
     account,
   })
-  const { stateAccount, calculateDevotionGrowth, userTokenBalance } = useDevotionProgram()
+  const { stateAccount, userTokenBalance } = useDevotionProgram()
   const [devoteAmount, setDevoteAmount] = useState('')
   const [waverAmount, setWaverAmount] = useState('')
 
@@ -446,7 +427,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
                 const wholeNumber = parseInt(e.target.value);
                 setDevoteAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
               }}
-              className={`input input-bordered w-full placeholder:text-gray-500 ${
+              className={`input input-bordered w-full placeholder:text-gray-500 text-center ${
                 devoteAmount && !isDevoteAmountValid() ? 'input-error' : ''
               }`}
             />
@@ -479,7 +460,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
                 const wholeNumber = parseInt(e.target.value);
                 setWaverAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
               }}
-              className={`input input-bordered w-full placeholder:text-gray-500 ${
+              className={`input input-bordered w-full placeholder:text-gray-500 text-center ${
                 waverAmount && !isWaverAmountValid() ? 'input-error' : ''
               }`}
             />
@@ -508,10 +489,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
           >
             {heresyMutation.isPending ? 'Processing...' : 'Commit Heresy'}
           </button>
-        </div>
-
-        <div className="text-sm opacity-50">
-          <ExplorerLink path={`account/${account}`} label={ellipsify(account.toString())} />
         </div>
       </div>
     </div>
