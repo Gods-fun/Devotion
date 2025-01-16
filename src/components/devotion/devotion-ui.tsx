@@ -7,8 +7,6 @@ import { ExplorerLink } from '../cluster/cluster-ui'
 import { useDevotionProgram, useDevotionProgramAccount } from './devotion-data-access'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { BN } from '@coral-xyz/anchor'
-import { useMutation } from 'react-query'
-import { toast } from 'react-hot-toast'
 
 const formatLargeNumber = (num: string | number): string => {
   const number = Number(num);
@@ -42,11 +40,7 @@ export function DevotionCreate() {
   }
 
   if (stateAccount.data) {
-    return (
-      <div className="alert alert-info">
-        <span>Program has already been initialized.</span>
-      </div>
-    )
+    return null;
   }
 
   if (!publicKey) {
@@ -231,58 +225,54 @@ function NewDevotionCard() {
           )}
         </div>
 
-        <p className="text-sm mb-4 text-center w-full">You can retrieve your offering anytime.</p>
+        <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Amount of tokens to stake. You can retrieve your offering anytime.">
+          <input
+            type="number"
+            step="1"
+            placeholder="amount"
+            value={amount}
+            onChange={(e) => {
+              const wholeNumber = parseInt(e.target.value);
+              setAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
+            }}
+            className={`input input-bordered w-full placeholder:text-gray-500 ${
+              amount && !isAmountValid() ? 'input-error' : ''
+            }`}
+          />
+          <button
+            className="btn btn-primary w-full sm:w-auto"
+            onClick={() => {
+              if (amount) {
+                devoteMutation.mutateAsync({ amount: parseFloat(amount) })
+              }
+            }}
+            disabled={devoteMutation.isPending || !isAmountValid()}
+          >
+            Devote
+          </button>
+        </div>
 
-        <div className="flex flex-col gap-4 w-full max-w-xs">
-          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Amount of tokens to stake.">
-            <input
-              type="number"
-              step="1"
-              placeholder="amount"
-              value={amount}
-              onChange={(e) => {
-                const wholeNumber = parseInt(e.target.value);
-                setAmount(isNaN(wholeNumber) ? '' : wholeNumber.toString());
-              }}
-              className={`input input-bordered w-full placeholder:text-gray-500 ${
-                amount && !isAmountValid() ? 'input-error' : ''
-              }`}
-            />
+        {amount && !isAmountValid() && userTokenBalance.data && parseFloat(amount) > userTokenBalance.data && (
+          <div className="text-error text-sm">
+            Amount exceeds wallet balance
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-4 justify-center mt-2">
+          {[
+            { percentage: 25, color: 'bg-purple-400 hover:bg-purple-500' },
+            { percentage: 50, color: 'bg-purple-500 hover:bg-purple-600' },
+            { percentage: 75, color: 'bg-purple-600 hover:bg-purple-800' },
+            { percentage: 100, color: 'bg-purple-700 hover:bg-purple-950' }
+          ].map(({ percentage, color }) => (
             <button
-              className="btn btn-primary w-full sm:w-auto"
-              onClick={() => {
-                if (amount) {
-                  devoteMutation.mutateAsync({ amount: parseFloat(amount) })
-                }
-              }}
-              disabled={devoteMutation.isPending || !isAmountValid()}
+              key={percentage}
+              className={`btn ${color} text-white border-none min-w-[60px] sm:min-w-[80px]`}
+              onClick={() => handlePercentageClick(percentage / 100)}
             >
-              Devote
+              {percentage}%
             </button>
-          </div>
-
-          {amount && !isAmountValid() && userTokenBalance.data && parseFloat(amount) > userTokenBalance.data && (
-            <div className="text-error text-sm">
-              Amount exceeds wallet balance
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-4 justify-center mt-2">
-            {[
-              { percentage: 25, color: 'bg-purple-400 hover:bg-purple-500' },
-              { percentage: 50, color: 'bg-purple-500 hover:bg-purple-600' },
-              { percentage: 75, color: 'bg-purple-600 hover:bg-purple-800' },
-              { percentage: 100, color: 'bg-purple-700 hover:bg-purple-950' }
-            ].map(({ percentage, color }) => (
-              <button
-                key={percentage}
-                className={`btn ${color} text-white border-none min-w-[60px] sm:min-w-[80px]`}
-                onClick={() => handlePercentageClick(percentage / 100)}
-              >
-                {percentage}%
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
     </div>
@@ -327,11 +317,11 @@ function DevotionScore({ devoted, stakeState }: { devoted: any; stakeState: any 
   }, [devoted, stakeState])
 
   return (
-    <div className="stat">
-      <div className="stat-title">Current Devotion</div>
-      <div className="stat-value text-3xl text-yellow-200 lg:text-4xl">
-        {formatLargeNumber(currentDevotion)}
+    <div className="flex flex-col items-center">
+      <div className="stat-value text-5xl sm:text-6xl text-yellow-200 mb-2">
+        {Number(currentDevotion).toLocaleString()}
       </div>
+      <div className="text-lg opacity-80">Total Devotion Points</div>
     </div>
   )
 }
@@ -354,6 +344,10 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
   if (devotionQuery.isError || !devotionQuery.data) {
     return null;
+  }
+
+  if (devotionQuery.data.amount.isZero()) {
+    return <NewDevotionCard />;
   }
 
   const decimals = stateAccount.data?.decimals ?? 0
@@ -403,8 +397,17 @@ function DevotionCard({ account }: { account: PublicKey }) {
   return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content w-full">
       <div className="card-body items-center text-center p-4 sm:p-6">
-        <h2 className="card-title">Your Devotion</h2>
-        
+        <div className="w-full mb-8">
+          <h2 className="card-title justify-center mb-4">Current Devotion</h2>
+          <div className="bg-base-300 rounded-box p-6">
+            <DevotionScore 
+              devoted={devotionQuery.data} 
+              stakeState={stateAccount.data}
+            />
+          </div>
+        </div>
+
+        <h2 className="card-title mb-4">Your Devotion Details</h2>
         <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
           <div className="stat">
             <div className="stat-title">Wallet Balance</div>
@@ -421,11 +424,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </div>
             <div className="stat-desc">Currently staked</div>
           </div>
-          
-          <DevotionScore 
-            devoted={devotionQuery.data} 
-            stakeState={stateAccount.data}
-          />
           
           <div className="stat">
             <div className="stat-title">Max Devotion</div>
@@ -448,7 +446,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Devote more tokens to the gods.">
+          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Devote more tokens to the gods. You can retrieve your tokens at anytime.">
             <input
               type="number"
               step="1"

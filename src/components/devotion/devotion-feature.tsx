@@ -16,7 +16,7 @@ export default function DevotionFeature() {
       <AppHero
         title="Devotion"
         subtitle={
-          'Initialize the devotion program by inputting your interval, max devotion charge and token.  Devote new tokens, waver in your devotion to the gods or commit heresy.'
+          'Devote your tokens to the Gods by staking. Your devotion grows over time. Waver in your devotion to the gods or commit heresy in order to get your tokens back.'
         }
       >
         <p className="mb-6">
