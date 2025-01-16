@@ -86,7 +86,7 @@ export function useDevotionProgram() {
       }
     },
     enabled: !!publicKey && !!stateAccount.data?.stakeMint,
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   const initialize = useMutation<string, Error, InitializeArgs>({
@@ -120,7 +120,7 @@ export function useDevotionProgram() {
       return accounts[0] || null;
     },
     enabled: !!publicKey,
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   return {
