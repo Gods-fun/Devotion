@@ -22,11 +22,11 @@ The maintainers of this repository are not responsible for any losses, damages, 
 
 This is antoken staking program for Solana that allows users to build up a long term score for staking tokens.  That score can affect how the agents interact with users.  It can also be consumed by other Solana programs to enable interesting game mechanics.
 
-`initialize` allows developers to set the interval for Devotion growth per token, the maximum amount of Devotion that can charge for each token, and the desired agent token's mint address
-`devote` allows users to stake tokens and build Devotion.  Devotion grows over time until the maximum devotion charge time.
-`waver` allows users to unstake some tokens.  This will reset your Devotion to zero.  Devote responsibly mortal.
-`heresy` will withdraw all staked tokens and refund the user's account rent SOL.
-`check_devotion` returns the real-time Devotion score of a user and enables other Solana programs to interact with users based on their devotion.
+- `initialize` allows developers to set the interval for Devotion growth per token, the maximum amount of Devotion that can charge for each token, and the desired agent token's mint address
+- `devote` allows users to stake tokens and build Devotion.  Devotion grows over time until the maximum devotion charge time.
+- `waver` allows users to unstake some tokens.  This will reset your Devotion to zero.  Devote responsibly mortal.
+- `heresy` will withdraw all staked tokens and refund the user's account rent SOL.
+- `check_devotion` returns the real-time Devotion score of a user and enables other Solana programs to interact with users based on their devotion.
 
 ## Setup
 
