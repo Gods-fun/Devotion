@@ -8,11 +8,14 @@ skip-lint = false
 [programs.localnet]
 devotion = "GodsAfuZbVYY79KADVMe39ZwybWuL5U6RFLvyzUD5qgw"
 
+[programs.mainnet]
+devotion = "GodsAfuZbVYY79KADVMe39ZwybWuL5U6RFLvyzUD5qgw"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
