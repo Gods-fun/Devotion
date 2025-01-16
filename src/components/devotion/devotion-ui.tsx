@@ -225,7 +225,7 @@ function NewDevotionCard() {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Amount of tokens to stake. You can retrieve your offering anytime.">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="number"
             step="1"
@@ -239,17 +239,19 @@ function NewDevotionCard() {
               amount && !isAmountValid() ? 'input-error' : ''
             }`}
           />
-          <button
-            className="btn btn-primary w-full sm:w-auto"
-            onClick={() => {
-              if (amount) {
-                devoteMutation.mutateAsync({ amount: parseFloat(amount) })
-              }
-            }}
-            disabled={devoteMutation.isPending || !isAmountValid()}
-          >
-            Devote
-          </button>
+          <div className="tooltip" data-tip="Amount of tokens to stake. You can retrieve your offering anytime.">
+            <button
+              className="btn btn-primary w-full sm:w-auto"
+              onClick={() => {
+                if (amount) {
+                  devoteMutation.mutateAsync({ amount: parseFloat(amount) })
+                }
+              }}
+              disabled={devoteMutation.isPending || !isAmountValid()}
+            >
+              Devote
+            </button>
+          </div>
         </div>
 
         {amount && !isAmountValid() && userTokenBalance.data && parseFloat(amount) > userTokenBalance.data && (
@@ -446,7 +448,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Devote more tokens to the gods. You can retrieve your tokens at anytime.">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="number"
               step="1"
@@ -460,13 +462,15 @@ function DevotionCard({ account }: { account: PublicKey }) {
                 devoteAmount && !isDevoteAmountValid() ? 'input-error' : ''
               }`}
             />
-            <button
-              className="btn btn-primary w-full sm:w-auto"
-              onClick={() => devoteMutation.mutateAsync({ amount: parseFloat(devoteAmount) })}
-              disabled={devoteMutation.isPending || !isDevoteAmountValid()}
-            >
-              Devote More
-            </button>
+            <div className="tooltip" data-tip="Devote more tokens to the gods. You can retrieve your tokens at anytime.">
+              <button
+                className="btn btn-primary w-full sm:w-auto"
+                onClick={() => devoteMutation.mutateAsync({ amount: parseFloat(devoteAmount) })}
+                disabled={devoteMutation.isPending || !isDevoteAmountValid()}
+              >
+                Devote More
+              </button>
+            </div>
           </div>
 
           {devoteAmount && !isDevoteAmountValid() && (
@@ -477,7 +481,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-2 tooltip" data-tip="Retrieve devoted tokens from the gods. WARNING: This will reset your devotion to 0.">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="number"
               step="1"
@@ -491,13 +495,15 @@ function DevotionCard({ account }: { account: PublicKey }) {
                 waverAmount && !isWaverAmountValid() ? 'input-error' : ''
               }`}
             />
-            <button
-              className="btn btn-secondary w-full sm:w-auto"
-              onClick={() => waverMutation.mutateAsync({ amount: parseFloat(waverAmount) })}
-              disabled={waverMutation.isPending || !isWaverAmountValid()}
-            >
-              Waver
-            </button>
+            <div className="tooltip" data-tip="Retrieve devoted tokens from the gods. WARNING: This will reset your devotion to 0.">
+              <button
+                className="btn btn-secondary w-full sm:w-auto"
+                onClick={() => waverMutation.mutateAsync({ amount: parseFloat(waverAmount) })}
+                disabled={waverMutation.isPending || !isWaverAmountValid()}
+              >
+                Waver
+              </button>
+            </div>
           </div>
 
           {waverAmount && !isWaverAmountValid() && devotionQuery.data && parseFloat(waverAmount) > devotedAmount && (
@@ -508,7 +514,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
 
           <button
             className="btn btn-error tooltip w-full hover:bg-red-900 hover:border-red-950" 
-            data-tip="Retrieve all devoted tokens from the gods. WARNING: This will reset your devotion and may wrath the gods."
+            data-tip="Retrieve all devoted tokens from the gods. WARNING: This will reset your devotion and incur the wrath of the gods."
             onClick={handleHeresy}
             disabled={heresyMutation.isPending}
           >
