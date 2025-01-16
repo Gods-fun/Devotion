@@ -27,12 +27,6 @@ interface WaverArgs {
   amount: number
 }
 
-interface InterestCalculation {
-  dailyInterest: number;
-  projectedMonthlyInterest: number;
-  projectedYearlyInterest: number;
-}
-
 export function useDevotionProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -92,6 +86,7 @@ export function useDevotionProgram() {
       }
     },
     enabled: !!publicKey && !!stateAccount.data?.stakeMint,
+    refetchInterval: 5000,
   });
 
   const initialize = useMutation<string, Error, InitializeArgs>({
@@ -125,23 +120,8 @@ export function useDevotionProgram() {
       return accounts[0] || null;
     },
     enabled: !!publicKey,
+    refetchInterval: 5000,
   });
-
-  const calculateInterest = (devotedBalance: number): InterestCalculation | null => {
-    if (!stateAccount.data?.interval) return null;
-    
-    // Convert interval from seconds to days
-    const intervalInDays = stateAccount.data.interval.toNumber() / (24 * 60 * 60);
-    
-    // Calculate daily interest rate (0.1% per day per devoted token)
-    const dailyInterest = devotedBalance * (0.001 / intervalInDays);
-    
-    return {
-      dailyInterest,
-      projectedMonthlyInterest: dailyInterest * 30,
-      projectedYearlyInterest: dailyInterest * 365,
-    };
-  };
 
   return {
     program,
@@ -151,14 +131,13 @@ export function useDevotionProgram() {
     stateAccount,
     userDevotedAccount,
     userTokenBalance,
-    calculateInterest,
   }
 }
 
 export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster()
   const transactionToast = useTransactionToast()
-  const { program, stateAccount, userDevotedAccount } = useDevotionProgram()
+  const { program, stateAccount, userDevotedAccount, userTokenBalance } = useDevotionProgram()
 
   const devotionQuery = useQuery({
     queryKey: ['devotion', 'fetch', { cluster, account }],
@@ -183,10 +162,22 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
     },
     onSuccess: async (tx) => {
       transactionToast(tx)
-      await Promise.all([
+      
+      // Start immediate refetch
+      Promise.all([
         devotionQuery.refetch(),
-        userDevotedAccount.refetch()
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
       ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Devote error:', error);
@@ -209,9 +200,24 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
         .accounts({ stakeMint: stateAccount.data.stakeMint })
         .rpc();
     },
-    onSuccess: (tx) => {
+    onSuccess: async (tx) => {
       transactionToast(tx)
-      return devotionQuery.refetch()
+      
+      // Start immediate refetch
+      Promise.all([
+        devotionQuery.refetch(),
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
+      ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Waver error:', error);
@@ -227,10 +233,22 @@ export function useDevotionProgramAccount({ account }: { account: PublicKey }) {
     },
     onSuccess: async (tx) => {
       transactionToast(tx)
-      await Promise.all([
+      
+      // Start immediate refetch
+      Promise.all([
         devotionQuery.refetch(),
-        userDevotedAccount.refetch()
+        userDevotedAccount.refetch(),
+        userTokenBalance.refetch()
       ])
+
+      // Additional refetch after a delay to ensure chain state is updated
+      setTimeout(() => {
+        Promise.all([
+          devotionQuery.refetch(),
+          userDevotedAccount.refetch(),
+          userTokenBalance.refetch()
+        ])
+      }, 2000)
     },
     onError: (error) => {
       console.error('Heresy error:', error)

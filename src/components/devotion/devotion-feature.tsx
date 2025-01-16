@@ -2,26 +2,21 @@
 
 import { useWallet } from '@solana/wallet-adapter-react'
 import { WalletButton } from '../solana/solana-provider'
-import { AppHero, ellipsify } from '../ui/ui-layout'
-import { ExplorerLink } from '../cluster/cluster-ui'
+import { AppHero } from '../ui/ui-layout'
 import { useDevotionProgram } from './devotion-data-access'
 import { DevotionCreate, DevotionList } from './devotion-ui'
 
 export default function DevotionFeature() {
   const { publicKey } = useWallet()
-  const { programId } = useDevotionProgram()
 
   return publicKey ? (
     <div>
       <AppHero
         title="Devotion"
         subtitle={
-          'Initialize the devotion program by inputting your interval, max devotion charge and token.  Devote new tokens, waver in your devotion to the gods or commit heresy.'
+          'Devote your tokens to the Gods by staking. Your devotion grows over time. Waver in your devotion to the gods or commit heresy in order to get your tokens back.'
         }
       >
-        <p className="mb-6">
-          <ExplorerLink path={`account/${programId}`} label={ellipsify(programId.toString())} />
-        </p>
         <DevotionCreate />
       </AppHero>
       <DevotionList />
