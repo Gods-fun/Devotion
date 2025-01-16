@@ -20,7 +20,7 @@ The maintainers of this repository are not responsible for any losses, damages, 
 
 ## Devotion
 
-This is antoken staking program for Solana that allows users to build up a long term score for staking tokens.  That score can affect how the agents interact with users.  It can also be consumed by other Solana programs to enable interesting game mechanics.
+This is a standard SPL token staking program for Solana that allows users to build up a long term score for staking tokens called "Devotion".  That score can affect how the agents interact with users.  It can also be consumed by other Solana programs to enable interesting game mechanics.
 
 - `initialize` allows developers to set the interval for Devotion growth per token, the maximum amount of Devotion that can charge for each token, and the desired agent token's mint address
 - `devote` allows users to stake tokens and build Devotion.  Devotion grows over time until the maximum devotion charge time.
