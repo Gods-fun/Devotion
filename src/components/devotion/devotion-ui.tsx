@@ -332,7 +332,7 @@ function DevotionCard({ account }: { account: PublicKey }) {
   const { devotionQuery, devoteMutation, waverMutation, heresyMutation } = useDevotionProgramAccount({
     account,
   })
-  const { stateAccount, calculateInterest, userTokenBalance } = useDevotionProgram()
+  const { stateAccount, calculateDevotionGrowth, userTokenBalance } = useDevotionProgram()
   const [devoteAmount, setDevoteAmount] = useState('')
   const [waverAmount, setWaverAmount] = useState('')
 
@@ -364,7 +364,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
   }
 
   const devotedAmount = devotionQuery.data.amount.toNumber() / Math.pow(10, decimals)
-  const interestRates = calculateInterest(devotedAmount)
 
   const calculateMaxDevotion = (devotedAmount: BN) => {
     if (!stateAccount.data) return null;
@@ -434,17 +433,6 @@ function DevotionCard({ account }: { account: PublicKey }) {
             </div>
             <div className="stat-desc">Maximum achievable</div>
           </div>
-          
-          {interestRates && (
-            <div className="stat">
-              <div className="stat-title">Devotion Rewards</div>
-              <div className="stat-desc flex flex-col gap-1">
-                <div>Daily: <span className="text-info">{Math.round(interestRates.dailyInterest)}</span></div>
-                <div>Monthly: <span className="text-info">{Math.round(interestRates.projectedMonthlyInterest)}</span></div>
-                <div>Yearly: <span className="text-info">{Math.round(interestRates.projectedYearlyInterest)}</span></div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">

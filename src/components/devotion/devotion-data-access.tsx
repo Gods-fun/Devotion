@@ -27,12 +27,6 @@ interface WaverArgs {
   amount: number
 }
 
-interface InterestCalculation {
-  dailyInterest: number;
-  projectedMonthlyInterest: number;
-  projectedYearlyInterest: number;
-}
-
 export function useDevotionProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -127,22 +121,6 @@ export function useDevotionProgram() {
     enabled: !!publicKey,
   });
 
-  const calculateInterest = (devotedBalance: number): InterestCalculation | null => {
-    if (!stateAccount.data?.interval) return null;
-    
-    // Convert interval from seconds to days
-    const intervalInDays = stateAccount.data.interval.toNumber() / (24 * 60 * 60);
-    
-    // Calculate daily interest rate (0.1% per day per devoted token)
-    const dailyInterest = devotedBalance * (0.001 / intervalInDays);
-    
-    return {
-      dailyInterest,
-      projectedMonthlyInterest: dailyInterest * 30,
-      projectedYearlyInterest: dailyInterest * 365,
-    };
-  };
-
   return {
     program,
     programId,
@@ -151,7 +129,6 @@ export function useDevotionProgram() {
     stateAccount,
     userDevotedAccount,
     userTokenBalance,
-    calculateInterest,
   }
 }
 
