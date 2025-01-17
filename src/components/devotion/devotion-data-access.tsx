@@ -123,6 +123,17 @@ export function useDevotionProgram() {
     refetchInterval: 10000,
   });
 
+  const totalDevotedAccount = useQuery({
+    queryKey: ['devotion', 'total-devoted', { cluster }],
+    queryFn: () => program.account.totalDevoted.fetch(
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("total_devoted")],
+        programId
+      )[0]
+    ),
+    refetchInterval: 600000,
+  });
+
   return {
     program,
     programId,
@@ -131,6 +142,7 @@ export function useDevotionProgram() {
     stateAccount,
     userDevotedAccount,
     userTokenBalance,
+    totalDevotedAccount,
   }
 }
 
