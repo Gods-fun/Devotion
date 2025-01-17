@@ -95,9 +95,9 @@ export function DevotionCreate() {
 
 export function DevotionList() {
   const { publicKey } = useWallet()
-  const { getProgramAccount, stateAccount, userDevotedAccount } = useDevotionProgram()
+  const { getProgramAccount, stateAccount, userDevotedAccount, totalDevotedAccount } = useDevotionProgram()
 
-  if (getProgramAccount.isLoading || userDevotedAccount.isLoading) {
+  if (getProgramAccount.isLoading || userDevotedAccount.isLoading || totalDevotedAccount.isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <span className="loading loading-spinner loading-lg"></span>
@@ -123,6 +123,7 @@ export function DevotionList() {
 
   return (
     <div className="space-y-6 w-full px-4">
+      <TotalDevotedStats />
       {publicKey ? (
         userDevotedAccount.data ? (
           <DevotionCard account={userDevotedAccount.data.publicKey} />
@@ -490,6 +491,27 @@ function DevotionCard({ account }: { account: PublicKey }) {
             {heresyMutation.isPending ? 'Processing...' : 'Commit Heresy'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function TotalDevotedStats() {
+  const { stateAccount, totalDevotedAccount } = useDevotionProgram()
+
+  if (!stateAccount.data || !totalDevotedAccount.data) return null
+
+  const decimals = stateAccount.data.decimals
+  const totalTokens = totalDevotedAccount.data.totalTokens.toNumber() / Math.pow(10, decimals)
+
+  return (
+    <div className="card bg-base-300 shadow-xl">
+      <div className="card-body items-center text-center p-4">
+        <h2 className="card-title text-xl mb-2">Total Tokens Devoted</h2>
+        <div className="stat-value text-4xl text-primary">
+          {formatLargeNumber(totalTokens)}
+        </div>
+        <p className="text-sm opacity-70">Tokens currently devoted to the gods</p>
       </div>
     </div>
   )
